@@ -13,6 +13,7 @@
 
 ## The data set
   # describe dataset, it's origins, and size
+#"different undergraduate degrees, such as agronomy, design, education, nursing, journalism, management, social service, and technologies. The dataset includes information known at the time of student enrollment (academic path, demographics, and social-economic factors) and the students' academic performance at the end of the first and second semesters. The data is used to build classification models to predict students' dropout and academic sucess. The problem is formulated as a three category classification task, in which there is a strong imbalance towards one of the classes." - plagerism rn... cite
 # Requirements:
 # - Ensure necessary libraries are installed (see library loading section)(should be automated).
 # - If you've downloaded the entire repository then the code should run fine. 
@@ -300,7 +301,7 @@ coefplot(value1, sort = 'magnitude', conf.int = TRUE)
 # Group variables for analysis
 binary_vars <- c("tuition_fees_up_to_date", "gender", "scholarship_holder", 
                  "debtor", "international", "educational_special_needs")
-categorical_vars <- c("marital_status", "application_mode", "daytime_evening_attendance")
+categorical_vars <- c("marital_status", "application_mode", "daytime_evening_attendance", "nacionality")
 continuous_vars <- c("admission_grade", "curricular_units_1st_sem_grade", "gdp")
 
 
@@ -399,20 +400,111 @@ print(binary_target_table)
 # The chart above reflects the regression above that these variables do have a high number of 
 # of graduated students, which is typical with the National Center for Education Statistics reporting average 6year gradaution of college
 # at 64% in 2020.
+
 # A few powerful takeaways include: 
 #- A significant number of students who dropped out (312) were debtors compared to those who graduated (101) or are still enrolled (90).
-#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374)
-#- Although there are significantly more men (2278) than women (1262), in the dataset, they have roughly the same number of drop outs (men = 556 & women = 569)
-# Almost all of students who owe tuition fees (87%) dropout.
+#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374). However, The rate of scholarship holders dropping out (12%)
+  # is much loter tahn that of nonscholarship holdrs 38%. Suggesting financial support is an incentive to not dropout
+scholarship_holder_rate <- binary_target_table %>%
+  filter(Variable == "scholarship_holder", Value == 1) %>%
+  summarize(
+    total_scholarship_dropouts = sum(Target_1),
+    total_scholarship_students = sum(Target_1 + Target_2 + Target_3),
+    scholarship_dropout_rate = total_scholarship_dropouts / total_scholarship_students
+  )
+scholarship_holder_rate
+# same a above for non_scholarship holders
+non_scholarship_holder_rate <- binary_target_table %>%
+  filter(Variable == "scholarship_holder", Value == 0) %>%
+  summarize(
+    total_non_scholarship_dropouts = sum(Target_1),
+    total_non_scholarship_students = sum(Target_1 + Target_2 + Target_3),
+    non_scholarship_dropout_rate = total_non_scholarship_dropouts / total_non_scholarship_students
+  )
+non_scholarship_holder_rate
+#- Although there are significantly more men (2278) than women (1262), in the dataset, they have roughly the same number of drop outs (men = 556 & women = 569).
+  # As a result, the rate of female_drop out is very high 45% for women vs 24% for men.
+  # This could be sampling error and possibly unique to the dataset which is taken from the following diverse degree programs:
+  #"agronomy, design, education, nursing, journalism, management, social service, and technologies" (cite).
+gender_male_rate <- binary_target_table %>%
+  filter(Variable == "gender", Value == 0) %>%
+  summarize(
+    total_male_dropouts = sum(Target_1),
+    total_male_students = sum(Target_1 + Target_2 + Target_3),
+    male_dropout_rate = total_male_dropouts / total_male_students
+  )
+gender_male_rate
+
+gender_female_rate <- binary_target_table %>%
+  filter(Variable == "gender", Value == 1) %>%
+  summarize(
+    total_female_dropouts = sum(Target_1),
+    total_female_students = sum(Target_1 + Target_2 + Target_3),
+    female_dropout_rate = total_female_dropouts / total_female_students
+  )
+gender_female_rate
+
+# Almost all of students who owe tuition fees (87%) dropout. Shedding light again on the importance of financial support and reflecting 
+  # the finding in the regression chart as the most predictive with a correlation coefficient of .5
 owe_fees_drop_rate <- binary_target_table %>%
   filter(Variable == "tuition_fees_up_to_date", Value == 0) %>%
   summarize(
     total_owe_fee_dropouts = sum(Target_1),
-    total__owe_fee_students = sum(Target_1 + Target_2 + Target_3),
-    owe_money_dropout_rate = total_dropouts / total_students
+    total_owe_fee_students = sum(Target_1 + Target_2 + Target_3),
+    owe_fee_dropout_rate = total_owe_fee_dropouts / total_owe_fee_students
   )
 owe_fees_drop_rate
-}###############################################################################
+
+# International students have a drop out rate of 30%, which is similar to the total dropout rate of teh data set ~32%.
+# this is interesting when internation status was the second most predictive variable after tuition and fees up to date.
+international_rate <- binary_target_table %>%
+  filter(Variable == "international", Value == 1) %>%
+  summarize(
+    total_international_dropouts = sum(Target_1),
+    total_international_students = sum(Target_1 + Target_2 + Target_3),
+    international_dropout_rate = total_international_dropouts / total_international_students
+  )
+international_rate
+# Calculate overall dropout rate
+overall_dropout_rate <- traindata %>%
+  summarize(
+    total_dropouts = sum(target == 1),
+    total_students = n(),
+    dropout_rate = total_dropouts / total_students
+  )
+overall_dropout_rate
+
+# Althought there were not many students with special needs in the dataset, the 
+# the perseverence of these students, and possibly their support is clear when the dropout rate of 35% is not much
+# high than that of the dataset as a whole (~32%)
+educational_special_needs_rate <- binary_target_table %>%
+  filter(Variable == "educational_special_needs", Value == 1) %>%
+  summarize(
+    total_special_needs_dropouts = sum(Target_1),
+    total_special_needs_students = sum(Target_1 + Target_2 + Target_3),
+    special_needs_dropout_rate = total_special_needs_dropouts / total_special_needs_students
+  )
+educational_special_needs_rate
+
+
+###############################################################################
+#Continuous Variables, specifically, the cirriculular unit variables
+
+variable_table %>%
+  slice(22:33) %>%  # Select rows 22 to 33
+  select(Variable_Name, Description) %>%  # Select specific columns
+  print()
+# As seen above the curricular unit variables give us 6 looks at how the students stand each semester.
+# - The number of credits earned
+# - The number of units enrolled in
+# - The number of evaluations/ tests taken
+# - The number of units they were approved to take
+# - Their Grade avg 
+# - The number of units that didn't have tests/evaluations (conceivably easier courses.)
+
+
+
+
 #LOOK INTO NATIONALITY OF STUDENTS WITH LOOKUP TABLE FOR BIAS READING IN EXPORITORY ANALYSIS
 
 
