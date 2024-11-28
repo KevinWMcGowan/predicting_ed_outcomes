@@ -1,4 +1,5 @@
 # Predicting College Graduation Analysis
+# Introduction
 # This script processes the “Predict Students’ Dropout and Academic Success” dataset, 
 # developed by Realinho and colleagues (2021). It includes feature engineering and 
 # utilizes ________ models to predict student outcomes: college graduation, dropout, or enrollment.
@@ -10,14 +11,18 @@
 # With this desired end in mind, the following reports aims to support
 # counselors, administrators, and teachers and ultimately students by informing who might needs the most help.
 
+## The data set
+  # describe dataset, it's origins, and size
 # Requirements:
 # - Ensure necessary libraries are installed (see library loading section)(should be automated).
 # - If you've downloaded the entire repository then the code should run fine. 
 
 
+
 ################################################################################
 # Load Libraries
 ################################################################################
+
 # List of required packages
 packages <- c("readr", "tinytex", "dplyr", "caret", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
 
@@ -34,6 +39,7 @@ lapply(packages, library, character.only = TRUE)
 ################################################################################
 # Download data & variable table
 ################################################################################
+
 # Set up the file paths for the data files
 data_path <- here("data", "data.csv")
 variable_table_path <- here("data", "variable_table.csv")
@@ -47,9 +53,14 @@ if (!file.exists(data_path)) {
 # Load the datasets
 data <- read.csv(data_path, header = TRUE, sep = ";")
 variable_table <- read_csv(variable_table_path)
-view(variable_table)
+
+head(data)
+head(variable_table)
 
 ################################################################################
+# Clean the datasets
+################################################################################
+
 # As seen below, the column names include spaces and parenthesis. Both of which
 # will cause issues with analysis later on.
 cat("Column names in `data` before cleaning:\n")
@@ -192,19 +203,11 @@ unique(data$target)
 # "Dropout" -> 1
 # "Enrolled" -> 2
 # "Graduate" -> 3
-# Count the occurrences of each value in the target column
-target_counts <- table(data$target)
 
-# Print the counts
-print(target_counts)
 
-# If you want a more descriptive output
-cat("Counts for each target value:\n")
-for (value in names(target_counts)) {
-  cat(value, ":", target_counts[value], "\n")
-}
 ################################################################################
 ## Split the dataset
+
 # Now before any analysis or exploraiton is done, the dataset must be split in order
 # to avoid overfitting
 # PARTITION DATA
@@ -219,7 +222,7 @@ testdata  <- data[-trainindex,]
 
 
 ################################################################################
-# Exploratory Data Analysis
+# Exploratory Data Analysis (ENSURE HENCE FORTH NO DATA IS USED!!!!! ONLY TRAIN DATA)
 ################################################################################
 # Now that the data has been cleaned, some exploration can be done to better understand
 # the students in the dataset by the variables that describe them. Any findings can contribute
@@ -227,10 +230,10 @@ testdata  <- data[-trainindex,]
 
 # see number of students in dataset
 nrow(traindata)
-#4424 students
+#3540 students
 #see the number of variables in the dataset
 ncol(traindata)
-# 36 variables to help predict target
+# 36 variables to help predict target (37th)
 # See the unique values of the target variable.
 unique(traindata$target)
 table(traindata$target)
@@ -238,27 +241,14 @@ table(traindata$target)
 # the relativly small number of currently enrolled students might lead to difficulty. 
 # Look at the top 6 values of each column
 head(traindata)
-#all values are coded with numbers, except the target variable.
+#all values are coded with numbers. In order to have a functional and targeted exploration, the following section 
+# performs a linear regression to get an idea of what variables are predictive of dropout, enrolled, and graduated. Afterwards, these predictive variables
+# will be explored more thoroughly.
 
-################################################################################
-# Create lookup Table
-
-# As was seen in the top 6 rows of each column, all values are coded with numbers, except the target variable.
-# As a result, a lookup table from the variable_table is needed to make sense of these values.
-
-# Create a lookup table with variable names and descriptions
-lookup_table <- variable_table %>%
-  select(Variable_Name, Description) %>%
-  rename(Column = Variable_Name)
-
-# Display the lookup table
-lookup_table
 
 ################################################################################
 # Perform Linear regression
 
-# Before diving into deep analysis of all 36 variables, a quick linear regression 
-# will help identify the most important predictors of dropout, enrolled, and graduated.
 
 # Extract variable names for the formula
 variables_train <- colnames(traindata)
@@ -305,171 +295,124 @@ coefplot(value1, sort = 'magnitude', conf.int = TRUE)
 # effectively in predictive modeling.
 
 ################################################################################
-## Explore Predictive Variables (all the following needs to update with lookup help)(read pilots folder for visuals)
-# Filter binary variables in the variable_table
-binary_var_descriptions <- variable_table %>%
-  filter(Variable_Name %in% binary_vars) %>%
-  select(Variable_Name, Description)
+# Investigate predictive variables
 
-# Print descriptions for binary variables
-cat("\n--- Descriptions for Binary Variables ---\n")
-print(binary_var_descriptions)
+# Group variables for analysis
+binary_vars <- c("tuition_fees_up_to_date", "gender", "scholarship_holder", 
+                 "debtor", "international", "educational_special_needs")
+categorical_vars <- c("marital_status", "application_mode", "daytime_evening_attendance")
+continuous_vars <- c("admission_grade", "curricular_units_1st_sem_grade", "gdp")
 
 
-colnames(variable_table)
+######################################
+# Binary variables
+view(variable_table)
+# View descriptions for binary variables
+
+# Select specific rows and print only the Variable_Name and Description columns
+variable_table %>%
+  slice(c(14:19, 21)) %>%  # Select rows 14 to 19 and 21
+  select(Variable_Name, Description) %>%  # Select specific columns
+  print()
+# 1 = yes & 0 = no for binary values
 
 
+# Prepare the data for plotting
+binary_data <- traindata %>%
+  select(all_of(binary_vars)) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value") %>%
+  count(Variable, Value)
 
+# Map human-readable names for binary variable values
+value_labels <- c("0" = "No/Not Applicable/Male", "1" = "Yes/Applicable/Female")
 
-#####################failed visualization below due to numeric values
-# Ensure the 'plots/' directory exists
-if (!dir.exists("plots")) {
-  dir.create("plots")
-}
-
-# Variables of interest
-variables_of_interest <- c(
-  "tuition_fees_up_to_date", "international", 
-  "curricular_units_2nd_sem_approved", "scholarship_holder", 
-  "daytime_evening_attendance", "curricular_units_1st_sem_enrolled",
-  "gender", "curricular_units_1st_sem_credited", 
-  "curricular_units_2nd_sem_credited", "educational_special_needs", 
-  "debtor", "curricular_units_2nd_sem_enrolled"
-)
-
-# Analyze distributions for binary variables
-binary_vars <- c("tuition_fees_up_to_date", "international", "scholarship_holder", 
-                 "daytime_evening_attendance", "gender", "educational_special_needs", "debtor")
-
-for (var in binary_vars) {
-  cat(paste("\n--- Distribution of", var, "---\n"))
-  print(table(data[[var]]))
-  
-  plot <- ggplot(data, aes_string(x = var)) +
-    geom_bar(fill = "steelblue", color = "black") +
-    labs(title = paste("Distribution of", var), x = var, y = "Count") +
-    theme_minimal()
-  
-  ggsave(filename = paste0("plots/", var, "_distribution.png"), plot = plot)
-}
-
-# Analyze distributions for continuous variables
-continuous_vars <- c("curricular_units_2nd_sem_approved", 
-                     "curricular_units_1st_sem_enrolled", 
-                     "curricular_units_1st_sem_credited", 
-                     "curricular_units_2nd_sem_credited", 
-                     "curricular_units_2nd_sem_enrolled")
-
-for (var in continuous_vars) {
-  cat(paste("\n--- Summary of", var, "---\n"))
-  print(summary(data[[var]]))
-  
-  plot <- ggplot(data, aes_string(x = var)) +
-    geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.7) +
-    labs(title = paste("Distribution of", var), x = var, y = "Count") +
-    theme_minimal()
-  
-  ggsave(filename = paste0("plots/", var, "_distribution.png"), plot = plot)
-}
-
-# Explore relationships between variables and the target
-cat("\n--- Exploring relationships with Target ---\n")
-
-# Binary variables vs. target
-for (var in binary_vars) {
-  cat(paste("\n---", var, "vs. Target ---\n"))
-  print(table(data[[var]], data$target))
-  
-  plot <- ggplot(data, aes_string(x = var, fill = "target")) +
-    geom_bar(position = "fill") +
-    labs(title = paste(var, "vs. Target"), x = var, y = "Proportion", fill = "Target") +
-    theme_minimal()
-  
-  ggsave(filename = paste0("plots/", var, "_vs_target.png"), plot = plot)
-}
-
-# Continuous variables vs. target
-for (var in continuous_vars) {
-  plot <- ggplot(data, aes_string(x = "target", y = var, fill = "target")) +
-    geom_boxplot() +
-    labs(title = paste(var, "vs. Target"), x = "Target", y = var) +
-    theme_minimal()
-  
-  ggsave(filename = paste0("plots/", var, "_vs_target.png"), plot = plot)
-}
-
-# Summarize findings
-cat("\n--- Summary of Exploratory Analysis ---\n")
-cat("Bar plots for binary variables and histograms for continuous variables have been saved in the 'plots' folder.\n")
-cat("Relationships with the target variable are visualized with bar plots for binary variables and boxplots for continuous variables.\n")
-
-
-
-
-
-#############test upidated plots below#########
-# Create directory if it doesn't exist
-if (!dir.exists("plots")) {
-  dir.create("plots")
-}
-
-# Binary variables to analyze
-binary_vars <- c(
-  "tuition_fees_up_to_date", "international", 
-  "scholarship_holder", "daytime_evening_attendance", 
-  "gender", "educational_special_needs", "debtor"
-)
-
-# Function to annotate plots with placeholders
-add_annotation <- function(plot, annotation_text) {
-  plot +
-    annotate(
-      "text", x = Inf, y = Inf, label = annotation_text, 
-      hjust = 1.1, vjust = 1.1, color = "red", size = 3, 
-      angle = 0
-    )
-}
-
-# Create and save updated plots
-for (var in binary_vars) {
-  cat(paste("\n---", var, "vs. Target ---\n"))
-  
-  # X-lookup interpretation
-  lookup_values <- unique(data[[var]])
-  cat("Lookup values for", var, ":", lookup_values, "\n")
-  
-  # Create bar plot
-  plot <- ggplot(data, aes_string(x = var, fill = "target")) +
-    geom_bar(position = "dodge") +
-    labs(
-      title = paste(var, "vs. Target"),
-      x = paste0(var, " (Value meaning annotated)"),
-      y = "Count",
-      fill = "Target"
-    ) +
-    theme_minimal() +
-    scale_fill_brewer(palette = "Set2") +
-    geom_text(
-      stat = "count",
-      aes(label = ..count..),
-      position = position_dodge(width = 0.9),
-      vjust = -0.3,
-      size = 3
-    )
-  
-  # Add placeholder annotations for x-lookup notes
-  annotation_text <- paste(
-    "Values for", var, ":",
-    paste(lookup_values, collapse = ", "),
-    "(Add meaning here)"
+# Create the bar chart
+ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  scale_fill_manual(
+    values = c("0" = "steelblue", "1" = "lightcoral"),
+    labels = value_labels
+  ) +
+  geom_text(
+    aes(label = n), 
+    position = position_dodge(width = 0.9), 
+    vjust = -0.5, 
+    size = 3
+  ) +
+  labs(
+    title = "Distribution of Binary Variables",
+    x = "Variables",
+    y = "Count",
+    fill = "Value"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5)
   )
-  plot <- add_annotation(plot, annotation_text)
-  
-  # Save the plot
-  ggsave(filename = paste0("plots/", var, "_vs_target_updated.png"), plot = plot)
-}
 
-################################################################################
+# The chart above shows that the vast majority of students are not debtor (don't owe money to school), nor special needs, most are male, aren't international, or scholarship holders
+# This finding warrent more digging, since the regression above found all but gender to be predictive of our target variable.
+# Below, compares the same variables against the 33 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
+# Prepare the data for plotting
+binary_target_data <- traindata %>%
+  select(all_of(binary_vars), target) %>%
+  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
+  count(Variable, Value, target)
+
+# Map human-readable names for binary variable values
+value_labels <- c("0" = "No/Not Applicable/Male", "1" = "Yes/Applicable/Female")
+
+# Create the grouped bar chart
+ggplot(binary_target_data, aes(x = Variable, y = n, fill = as.factor(target))) +
+  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
+  facet_wrap(~Value, labeller = labeller(Value = value_labels)) +
+  labs(
+    title = "Distribution of Binary Variables Across Target Levels",
+    x = "Variables",
+    y = "Count",
+    fill = "Target (1 = Dropout, 2 = Enrolled, 3 = Graduated)"
+  ) +
+  scale_fill_manual(
+    values = c("1" = "steelblue", "2" = "gold", "3" = "darkgreen"),
+    labels = c("1" = "Dropout", "2" = "Enrolled", "3" = "Graduated")
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    plot.title = element_text(hjust = 0.5),
+    strip.text = element_text(size = 10)
+  )
+# summary table of above: 
+# Table of binary variables against target
+binary_target_table <- traindata %>%
+  select(all_of(binary_vars), target) %>%
+  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
+  count(Variable, Value, target) %>%
+  pivot_wider(
+    names_from = target,
+    values_from = n,
+    values_fill = 0, # Fill missing combinations with 0
+    names_prefix = "Target_"
+  )
+print(binary_target_table)
+# The chart above reflects the regression above that these variables do have a high number of 
+# of graduated students, which is typical with the National Center for Education Statistics reporting average 6year gradaution of college
+# at 64% in 2020.
+# A few powerful takeaways include: 
+#- A significant number of students who dropped out (312) were debtors compared to those who graduated (101) or are still enrolled (90).
+#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374)
+#- Although there are significantly more men (2278) than women (1262), in the dataset, they have roughly the same number of drop outs (men = 556 & women = 569)
+# Almost all of students who owe tuition fees (87%) dropout.
+owe_fees_drop_rate <- binary_target_table %>%
+  filter(Variable == "tuition_fees_up_to_date", Value == 0) %>%
+  summarize(
+    total_owe_fee_dropouts = sum(Target_1),
+    total__owe_fee_students = sum(Target_1 + Target_2 + Target_3),
+    owe_money_dropout_rate = total_dropouts / total_students
+  )
+owe_fees_drop_rate
+}###############################################################################
 #LOOK INTO NATIONALITY OF STUDENTS WITH LOOKUP TABLE FOR BIAS READING IN EXPORITORY ANALYSIS
 
 
@@ -478,7 +421,8 @@ for (var in binary_vars) {
 
 
 
-
+#featues:
+#- create a owe money feature of students who both are debtor = 1 and tuition feeds up to date = 0 
 
 
 
@@ -547,3 +491,5 @@ get_description <- function(column_name, lookup_table) {
 # Example usage: Get description for "Marital.status"
 get_description("Marital_status", lookup_table)
 
+# Citations
+SOURCE: U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
