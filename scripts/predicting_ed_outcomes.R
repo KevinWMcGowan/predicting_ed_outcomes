@@ -47,12 +47,15 @@ if (!file.exists(data_path)) {
 # Load the datasets
 data <- read.csv(data_path, header = TRUE, sep = ";")
 variable_table <- read_csv(variable_table_path)
-#view(variable_table)
+view(variable_table)
 
 ################################################################################
 # As seen below, the column names include spaces and parenthesis. Both of which
 # will cause issues with analysis later on.
+cat("Column names in `data` before cleaning:\n")
 colnames(data)
+
+cat("\nVariable names in `variable_table` before cleaning:\n")
 print(variable_table$`Variable Name`)
 
 # In order to remove these problematic characters, the following regex code removes them.
@@ -74,28 +77,37 @@ clean_column_names <- function(colnames) {
 # Apply cleaning function to `data` columns
 colnames(data) <- clean_column_names(colnames(data))
 
-# Apply cleaning function to `variable_table`s "Variable Name" column
+# Apply cleaning function to `variable_table` columns
+colnames(variable_table) <- clean_column_names(colnames(variable_table))
+
+# Apply cleaning function to the "Variable Name" column in `variable_table`
 variable_table <- variable_table %>%
-  mutate(`Variable Name` = clean_column_names(`Variable Name`))
+  mutate(Variable_Name = clean_column_names(Variable_Name))
 
 # Print cleaned column names
-print(colnames(data))
-print(variable_table$`Variable Name`)
+cat("\nColumn names in `data` after cleaning:\n")
+colnames(data)
+
+cat("\nVariable names in `variable_table` after cleaning:\n")
+print(variable_table$Variable_Name)
 
 # Now that the problematic characters have been removed, for simplicity and future referencing,
 # ensure all variable names are the same:
-matching_variables <- intersect(colnames(data), variable_table$`Variable Name`)
-non_matching_in_data <- setdiff(colnames(data), variable_table$`Variable Name`)
-non_matching_in_variable_table <- setdiff(variable_table$`Variable Name`, colnames(data))
+matching_variables <- intersect(colnames(data), variable_table$Variable_Name)
+non_matching_in_data <- setdiff(colnames(data), variable_table$Variable_Name)
+non_matching_in_variable_table <- setdiff(variable_table$Variable_Name, colnames(data))
 
 # Print results
+cat("\nMatching Variables:\n")
 print(matching_variables)
-print(non_matching_in_data)
-print(non_matching_in_variable_table)
-# Print out above shows 6 variables have different names. 
-# The read out shows these differences include 
-# Regex code will help fix these difference include apostrophes, slashes, and dots with underscores.
 
+cat("\nVariables in `data` but not in `variable_table`:\n")
+print(non_matching_in_data)
+
+cat("\nVariables in `variable_table` but not in `data`:\n")
+print(non_matching_in_variable_table)
+
+# Clean any remaining differences in names using an additional cleaning function
 clean_names <- function(names) {
   names %>%
     tolower() %>%
@@ -104,27 +116,33 @@ clean_names <- function(names) {
     trimws()                        # Remove leading/trailing whitespace
 }
 
-# apply clean_names function to `data`
+# Apply the `clean_names` function to `data`
 colnames(data) <- clean_names(colnames(data))
 
-# apply clean_names function to `Variable Name` column in `variable_table`
+# Apply the `clean_names` function to the `Variable Name` column in `variable_table`
 variable_table <- variable_table %>%
-  mutate(`Variable Name` = clean_names(`Variable Name`))
+  mutate(Variable_Name = clean_names(Variable_Name))
 
 # Recheck matching variables
-matching_variables <- intersect(colnames(data), variable_table$`Variable Name`)
-non_matching_in_data <- setdiff(colnames(data), variable_table$`Variable Name`)
-non_matching_in_variable_table <- setdiff(variable_table$`Variable Name`, colnames(data))
+matching_variables <- intersect(colnames(data), variable_table$Variable_Name)
+non_matching_in_data <- setdiff(colnames(data), variable_table$Variable_Name)
+non_matching_in_variable_table <- setdiff(variable_table$Variable_Name, colnames(data))
 
-# Print results
-cat("Matching Variables:\n")
+# Print results after final cleaning
+cat("\nMatching Variables after final cleaning:\n")
 print(matching_variables)
-cat("\nVariables in `data` but not in `variable_table`:\n")
+
+cat("\nVariables in `data` but not in `variable_table` after final cleaning:\n")
 print(non_matching_in_data)
-cat("\nVariables in `variable_table` but not in `data`:\n")
+
+cat("\nVariables in `variable_table` but not in `data` after final cleaning:\n")
 print(non_matching_in_variable_table)
 
 #The above shows that all variable names are now matching.
+
+
+################################################################################
+## Set Variable Types
 
 # The next cleaning step is to set variable types. Luckily, the variable_table tells us
 # how to code each variable type for analysis. The following code shows expected type (variable table) vs
@@ -140,7 +158,7 @@ data_types <- data.frame(
 # Extract expected types from the variable_table
 # Adjust column names as per the actual structure of `variable_table`
 lookup_types <- variable_table %>%
-  select(Variable_Name = `Variable Name`, Expected_Type = Type)
+  select(Variable_Name = `Variable_Name`, Expected_Type = Type)
 
 # Join the actual types with the expected types
 comparison <- data_types %>%
@@ -230,8 +248,8 @@ head(traindata)
 
 # Create a lookup table with variable names and descriptions
 lookup_table <- variable_table %>%
-  select(`Variable Name`, Description) %>%
-  rename(Column = `Variable Name`)
+  select(Variable_Name, Description) %>%
+  rename(Column = Variable_Name)
 
 # Display the lookup table
 lookup_table
@@ -287,8 +305,23 @@ coefplot(value1, sort = 'magnitude', conf.int = TRUE)
 # effectively in predictive modeling.
 
 ################################################################################
-## Explore Predictive Variables (all the following needs to update with lookup help)(read pliots fodler for visuals)
+## Explore Predictive Variables (all the following needs to update with lookup help)(read pilots folder for visuals)
+# Filter binary variables in the variable_table
+binary_var_descriptions <- variable_table %>%
+  filter(Variable_Name %in% binary_vars) %>%
+  select(Variable_Name, Description)
 
+# Print descriptions for binary variables
+cat("\n--- Descriptions for Binary Variables ---\n")
+print(binary_var_descriptions)
+
+
+colnames(variable_table)
+
+
+
+
+#####################failed visualization below due to numeric values
 # Ensure the 'plots/' directory exists
 if (!dir.exists("plots")) {
   dir.create("plots")
@@ -371,6 +404,71 @@ cat("Bar plots for binary variables and histograms for continuous variables have
 cat("Relationships with the target variable are visualized with bar plots for binary variables and boxplots for continuous variables.\n")
 
 
+
+
+
+#############test upidated plots below#########
+# Create directory if it doesn't exist
+if (!dir.exists("plots")) {
+  dir.create("plots")
+}
+
+# Binary variables to analyze
+binary_vars <- c(
+  "tuition_fees_up_to_date", "international", 
+  "scholarship_holder", "daytime_evening_attendance", 
+  "gender", "educational_special_needs", "debtor"
+)
+
+# Function to annotate plots with placeholders
+add_annotation <- function(plot, annotation_text) {
+  plot +
+    annotate(
+      "text", x = Inf, y = Inf, label = annotation_text, 
+      hjust = 1.1, vjust = 1.1, color = "red", size = 3, 
+      angle = 0
+    )
+}
+
+# Create and save updated plots
+for (var in binary_vars) {
+  cat(paste("\n---", var, "vs. Target ---\n"))
+  
+  # X-lookup interpretation
+  lookup_values <- unique(data[[var]])
+  cat("Lookup values for", var, ":", lookup_values, "\n")
+  
+  # Create bar plot
+  plot <- ggplot(data, aes_string(x = var, fill = "target")) +
+    geom_bar(position = "dodge") +
+    labs(
+      title = paste(var, "vs. Target"),
+      x = paste0(var, " (Value meaning annotated)"),
+      y = "Count",
+      fill = "Target"
+    ) +
+    theme_minimal() +
+    scale_fill_brewer(palette = "Set2") +
+    geom_text(
+      stat = "count",
+      aes(label = ..count..),
+      position = position_dodge(width = 0.9),
+      vjust = -0.3,
+      size = 3
+    )
+  
+  # Add placeholder annotations for x-lookup notes
+  annotation_text <- paste(
+    "Values for", var, ":",
+    paste(lookup_values, collapse = ", "),
+    "(Add meaning here)"
+  )
+  plot <- add_annotation(plot, annotation_text)
+  
+  # Save the plot
+  ggsave(filename = paste0("plots/", var, "_vs_target_updated.png"), plot = plot)
+}
+
 ################################################################################
 #LOOK INTO NATIONALITY OF STUDENTS WITH LOOKUP TABLE FOR BIAS READING IN EXPORITORY ANALYSIS
 
@@ -416,7 +514,9 @@ cat("Relationships with the target variable are visualized with bar plots for bi
 
 
 
-
+# Limitations
+ # This data doesnt include year over year data resulting in limited conclusion ability based
+  # on annual distribution of enrolled, graduate, and drop out.
 
 
 
