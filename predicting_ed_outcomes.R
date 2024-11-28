@@ -149,22 +149,57 @@ comparison <- data_types %>%
 # View the comparison
 print(comparison)
 
-#Since R's equivelent of a "continuous" variable type is "numeric", there are only 2 changes to make:
-#- curricular_units_1st_sem_grade from numeric to integer
-#- target from character to factor (the categorical equivalent for ML classification tasks)
-# The following code makes these changes:
+# Since R's equivalent of a "continuous" variable type is "numeric", the following changes are made:
+# - `curricular_units_1st_sem_grade` is changed from numeric to integer.
+# - The `target` variable is replaced with numeric values for regression analysis.
+
+# Change `curricular_units_1st_sem_grade` from numeric to integer
 data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_grade)
 
-# Change `target` from character to factor
+# Verify the change for `curricular_units_1st_sem_grade`
+str(data[c("curricular_units_1st_sem_grade")])
+# This ensures that the column is now stored as integers, aligning with the expected variable type in the lookup table.
+
+# Encode `target` as numeric
+# Convert `target` into a factor if it isn't already
 data$target <- as.factor(data$target)
-# Verify the changes
-str(data[c("curricular_units_1st_sem_grade", "target")])
 
-#Above shows the three levels of outcomes for the target variable as a factor and
-# the integer values for curricular units 1st semester.
+# Replace the `target` variable with its numeric representation
+data$target <- as.numeric(data$target)
 
+# Verify the change for `target`
+unique(data$target)
+# The `target` variable is now numeric:
+# For example:
+# "Dropout" -> 1
+# "Enrolled" -> 2
+# "Graduate" -> 3
+# Count the occurrences of each value in the target column
+target_counts <- table(data$target)
 
+# Print the counts
+print(target_counts)
+
+# If you want a more descriptive output
+cat("Counts for each target value:\n")
+for (value in names(target_counts)) {
+  cat(value, ":", target_counts[value], "\n")
+}
 ################################################################################
+## Split the dataset
+# Now before any analysis or exploraiton is done, the dataset must be split in order
+# to avoid overfitting
+# PARTITION DATA
+#set up test and train sets
+# for reproducibility
+set.seed(123)  
+trainindex <- createDataPartition(data$target, p = .8, 
+                                  list = FALSE, 
+                                  times = 1)
+traindata <- data[trainindex,]
+testdata  <- data[-trainindex,]
+
+
 ################################################################################
 # Exploratory Data Analysis
 ################################################################################
@@ -173,14 +208,25 @@ str(data[c("curricular_units_1st_sem_grade", "target")])
 # to the modeling done later.
 
 # see number of students in dataset
-nrow(data)
+nrow(traindata)
 #4424 students
-ncol(data)
-
+#see the number of variables in the dataset
+ncol(traindata)
 # 36 variables to help predict target
-unique(data$target)
-# Knowing our task is to predict Dropout, Graduate, Enrolled
+# See the unique values of the target variable.
+unique(traindata$target)
+table(traindata$target)
+# 3 levels of outcomes to predict, 1137 have dropped out, 636 are currently enrolled, and 1768 have graduated.
+# the relativly small number of currently enrolled students might lead to difficulty. 
+# Look at the top 6 values of each column
+head(traindata)
+#all values are coded with numbers, except the target variable.
 
+################################################################################
+# Create lookup Table
+
+# As was seen in the top 6 rows of each column, all values are coded with numbers, except the target variable.
+# As a result, a lookup table from the variable_table is needed to make sense of these values.
 
 # Create a lookup table with variable names and descriptions
 lookup_table <- variable_table %>%
@@ -189,6 +235,198 @@ lookup_table <- variable_table %>%
 
 # Display the lookup table
 lookup_table
+
+################################################################################
+# Perform Linear regression
+
+# Before diving into deep analysis of all 36 variables, a quick linear regression 
+# will help identify the most important predictors of dropout, enrolled, and graduated.
+
+# Extract variable names for the formula
+variables_train <- colnames(traindata)
+
+# Remove the 'target' variable from the list of predictors
+variables_train <- variables_train[variables_train != "target"]
+
+# Create the formula as a string
+formula_string_train <- paste("target ~", paste(variables_train, collapse = " + "), - 1)
+
+# Convert the string to a formula object
+formula_train <- as.formula(formula_string_train)
+print(formula_train)
+
+# Perform linear regression
+value1 <- lm(formula_train, data = traindata)
+summary(value1)
+
+# Visualize the coefficients
+coefplot(value1, sort = 'magnitude', conf.int = TRUE)
+
+# The coefficient plot above highlights variables that are strongly predictive 
+# of the target outcome, as well as those with wide error margins crossing zero, 
+# indicating they may have little to no effect.
+
+# The plot suggests focusing on variables such as:
+# `tuition_fees_up_to_date`, `international`, 
+# `curricular_units_2nd_sem_approved`, `scholarship_holder`, 
+# `daytime_evening_attendance`, and `curricular_units_1st_sem_enrolled`, 
+# which show positive predictive values ranging from approximately 0.1 to 0.5.
+# These variables may contribute positively to predicting student outcomes like 
+# graduation or enrollment.
+
+# Conversely, certain factors show negative correlations with the target, 
+# as indicated by their negative coefficients. These include:
+# `gender`, `curricular_units_1st_sem_credited`, 
+# `curricular_units_2nd_sem_credited`, `educational_special_needs`, 
+# `debtor`, and `curricular_units_2nd_sem_enrolled`.
+# These insights suggest these variables may be associated with less favorable 
+# outcomes, such as dropout.
+
+# Together, these findings provide a foundation for deeper exploration into how 
+# these variables influence the target outcomes and how they can be utilized 
+# effectively in predictive modeling.
+
+################################################################################
+## Explore Predictive Variables (all the following needs to update with lookup help)(read pliots fodler for visuals)
+
+# Ensure the 'plots/' directory exists
+if (!dir.exists("plots")) {
+  dir.create("plots")
+}
+
+# Variables of interest
+variables_of_interest <- c(
+  "tuition_fees_up_to_date", "international", 
+  "curricular_units_2nd_sem_approved", "scholarship_holder", 
+  "daytime_evening_attendance", "curricular_units_1st_sem_enrolled",
+  "gender", "curricular_units_1st_sem_credited", 
+  "curricular_units_2nd_sem_credited", "educational_special_needs", 
+  "debtor", "curricular_units_2nd_sem_enrolled"
+)
+
+# Analyze distributions for binary variables
+binary_vars <- c("tuition_fees_up_to_date", "international", "scholarship_holder", 
+                 "daytime_evening_attendance", "gender", "educational_special_needs", "debtor")
+
+for (var in binary_vars) {
+  cat(paste("\n--- Distribution of", var, "---\n"))
+  print(table(data[[var]]))
+  
+  plot <- ggplot(data, aes_string(x = var)) +
+    geom_bar(fill = "steelblue", color = "black") +
+    labs(title = paste("Distribution of", var), x = var, y = "Count") +
+    theme_minimal()
+  
+  ggsave(filename = paste0("plots/", var, "_distribution.png"), plot = plot)
+}
+
+# Analyze distributions for continuous variables
+continuous_vars <- c("curricular_units_2nd_sem_approved", 
+                     "curricular_units_1st_sem_enrolled", 
+                     "curricular_units_1st_sem_credited", 
+                     "curricular_units_2nd_sem_credited", 
+                     "curricular_units_2nd_sem_enrolled")
+
+for (var in continuous_vars) {
+  cat(paste("\n--- Summary of", var, "---\n"))
+  print(summary(data[[var]]))
+  
+  plot <- ggplot(data, aes_string(x = var)) +
+    geom_histogram(binwidth = 1, fill = "steelblue", color = "black", alpha = 0.7) +
+    labs(title = paste("Distribution of", var), x = var, y = "Count") +
+    theme_minimal()
+  
+  ggsave(filename = paste0("plots/", var, "_distribution.png"), plot = plot)
+}
+
+# Explore relationships between variables and the target
+cat("\n--- Exploring relationships with Target ---\n")
+
+# Binary variables vs. target
+for (var in binary_vars) {
+  cat(paste("\n---", var, "vs. Target ---\n"))
+  print(table(data[[var]], data$target))
+  
+  plot <- ggplot(data, aes_string(x = var, fill = "target")) +
+    geom_bar(position = "fill") +
+    labs(title = paste(var, "vs. Target"), x = var, y = "Proportion", fill = "Target") +
+    theme_minimal()
+  
+  ggsave(filename = paste0("plots/", var, "_vs_target.png"), plot = plot)
+}
+
+# Continuous variables vs. target
+for (var in continuous_vars) {
+  plot <- ggplot(data, aes_string(x = "target", y = var, fill = "target")) +
+    geom_boxplot() +
+    labs(title = paste(var, "vs. Target"), x = "Target", y = var) +
+    theme_minimal()
+  
+  ggsave(filename = paste0("plots/", var, "_vs_target.png"), plot = plot)
+}
+
+# Summarize findings
+cat("\n--- Summary of Exploratory Analysis ---\n")
+cat("Bar plots for binary variables and histograms for continuous variables have been saved in the 'plots' folder.\n")
+cat("Relationships with the target variable are visualized with bar plots for binary variables and boxplots for continuous variables.\n")
+
+
+################################################################################
+#LOOK INTO NATIONALITY OF STUDENTS WITH LOOKUP TABLE FOR BIAS READING IN EXPORITORY ANALYSIS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ################################################################################
 # Optional
