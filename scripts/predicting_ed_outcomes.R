@@ -490,10 +490,12 @@ educational_special_needs_rate
 ###############################################################################
 #Continuous Variables, specifically, the cirriculular unit variables
 
-variable_table %>%
-  slice(22:33) %>%  # Select rows 22 to 33
-  select(Variable_Name, Description) %>%  # Select specific columns
-  print()
+semester_variables <- variable_table %>%
+  slice(22:33) %>%
+  mutate(
+    Semester = if_else(str_detect(Variable_Name, "1st_sem"), "1st Semester", "2nd Semester")
+  )
+print(semester_variables %>% select(Variable_Name, Semester))
 # As seen above the curricular unit variables give us 6 looks at how the students stand each semester.
 # - The number of credits earned
 # - The number of units enrolled in
@@ -502,32 +504,184 @@ variable_table %>%
 # - Their Grade avg 
 # - The number of units that didn't have tests/evaluations (conceivably easier courses.)
 
+# Identify trends
+# Group the continuous variables by semester and summarize their statistics
+semester_summary <- traindata %>%
+  select(all_of(semester_variables$Variable_Name)) %>%
+  pivot_longer(everything(), names_to = "Variable_Name", values_to = "Value") %>%
+  left_join(semester_variables, by = "Variable_Name") %>%
+  group_by(Semester, Variable_Name) %>%
+  summarize(
+    Mean = mean(Value, na.rm = TRUE),
+    Median = median(Value, na.rm = TRUE),
+    SD = sd(Value, na.rm = TRUE),
+    Min = min(Value, na.rm = TRUE),
+    Max = max(Value, na.rm = TRUE),
+    .groups = "drop"
+  )
+print(semester_summary)
+# The summary above shows teh following
+# On average students aer approved for 4.7 to 4.4 units each semester, but enroll 6.25 to 6.22, and are only credited .6 to .5 in the first and second semester, respectively.
+  # this finding suggests many students are not succeeding in passing their course.
+# Which is futher eemplified in an average greade of 10.3/20 in sem 1 and sem2. which is only .3 on average above the minimum passing grade.
+# most course offer atleast a few evalauations (evident by .14 -.15 avg units without an eval each semesters)
+
+# The following code visualizes the distribution of each of these variables.
+# Boxplot of variables grouped by semester
+traindata %>%
+  select(all_of(semester_variables$Variable_Name)) %>%
+  pivot_longer(everything(), names_to = "Variable_Name", values_to = "Value") %>%
+  left_join(semester_variables, by = "Variable_Name") %>%
+  ggplot(aes(x = Variable_Name, y = Value, fill = Semester)) +
+  geom_boxplot() +
+  facet_wrap(~ Semester, scales = "free") +
+  labs(
+    title = "Distribution of Continuous Variables by Semester",
+    x = "Variables",
+    y = "Values",
+    fill = "Semester"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
+# who are no longer earning credits, but also telling of students who might have dropped out, more than students enrolled (which is the smallest group)
+
+# Again, average grades are only just above 10/20 in semester 1, with some more variablility in semester 2, but a similar average.
 
 
 
-#LOOK INTO NATIONALITY OF STUDENTS WITH LOOKUP TABLE FOR BIAS READING IN EXPORITORY ANALYSIS
+#compare above to dropout and graduate
 
+# Filter and summarize for dropout students
+dropout_summary <- traindata %>%
+  filter(target == 1) %>%
+  select(all_of(continuous_vars)) %>%
+  pivot_longer(cols = everything(), names_to = "Variable_Name", values_to = "Value") %>%
+  mutate(Semester = if_else(str_detect(Variable_Name, "1st"), "1st Semester", "2nd Semester")) %>%
+  group_by(Semester, Variable_Name) %>%
+  summarize(
+    Mean_Dropout = mean(Value, na.rm = TRUE),
+    .groups = "drop"
+  )
 
+# Filter and summarize for graduated students
+graduated_summary <- traindata %>%
+  filter(target == 3) %>%
+  select(all_of(continuous_vars)) %>%
+  pivot_longer(cols = everything(), names_to = "Variable_Name", values_to = "Value") %>%
+  mutate(Semester = if_else(str_detect(Variable_Name, "1st"), "1st Semester", "2nd Semester")) %>%
+  group_by(Semester, Variable_Name) %>%
+  summarize(
+    Mean_Graduated = mean(Value, na.rm = TRUE),
+    .groups = "drop"
+  )
 
+# Merge the summaries and calculate differences
+dropout_with_diff_summary <- dropout_summary %>%
+  left_join(graduated_summary, by = c("Semester", "Variable_Name")) %>%
+  mutate(Difference_Graduated_vs_Dropout = Mean_Graduated - Mean_Dropout) %>%
+  select(Semester, Variable_Name, Mean_Dropout, Mean_Graduated, Difference_Graduated_vs_Dropout)
 
+# Print the final table
+print(dropout_with_diff_summary)
 
-
-
-#featues:
+#COMPLETE DESCRIPTION/SUMAMRY OF FINDINGS ABOVE AND HOW THEY SUGGEST FEATURE DEVELOPMENT
+# The table above shows clearly the difference in 
+################################################################################
+#Feature Development
+################################################################################
 #- create a owe money feature of students who both are debtor = 1 and tuition feeds up to date = 0 
+# create students who failed first semester with 1st Semester curricular_units_1st_sem_grade  =>10 (50% of 20) 
+# students who failed both first and second semester 2nd Semester curricular_units_2nd_sem_grade  =>10 & 1st Semester curricular_units_1st_sem_grade  =>10
+# under enrolled
+# create course ID to sem grade, and sem credited to get idea of harder courses. maybe even discouraging courses when taken first semester and then lead to student enrollment of 0 the next semester.
+# takin a break students who 2nd semester unit enrollment enroll = 0
+#hard courses could also be a feature where user had high number of unit 1st semeseter evalautions
+# gradautes could be earning 0 credits  in first or second semester because they are graduated. Maybe this could be a feature 
+# Define a feature engineering function
+feature_engineering <- function(data) {
+  # Make a copy of the data to preserve the original
+  data <- data %>% mutate(across(everything(), as.numeric, .names = "numeric_{col}"))
+  
+  # 1. Owe Money Feature
+  # Students who are debtors (debtor = 1) and have tuition fees not up to date (tuition_fees_up_to_date = 0)
+  data <- data %>%
+    mutate(
+      owe_money = ifelse(debtor == 1 & tuition_fees_up_to_date == 0, 1, 0)
+    )
+  
+  # 2. Failed First Semester
+  # Students with 1st semester grade less than or equal to 10 (50% of 20)
+  data <- data %>%
+    mutate(
+      failed_1st_semester = ifelse(curricular_units_1st_sem_grade <= 10, 1, 0)
+    )
+  
+  # 3. Failed Both Semesters
+  # Students with grades <= 10 in both semesters
+  data <- data %>%
+    mutate(
+      failed_both_semesters = ifelse(curricular_units_1st_sem_grade <= 10 &
+                                       curricular_units_2nd_sem_grade <= 10, 1, 0)
+    )
+  
+  # 4. Under-Enrolled
+  # Students enrolled in fewer than 4 units in 1st or 2nd semester
+  data <- data %>%
+    mutate(
+      under_enrolled = ifelse(curricular_units_1st_sem_enrolled < 4 |
+                                curricular_units_2nd_sem_enrolled < 4, 1, 0)
+    )
+  
+  # 5. Course ID to Grade and Credits (Encouraging/Discouraging Courses)
+  # Generate features that correlate course difficulty with grades and credits
+  data <- data %>%
+    mutate(
+      course_difficulty_score = curricular_units_1st_sem_grade / curricular_units_1st_sem_credited,
+      discouraging_courses = ifelse(course_difficulty_score < 1 &
+                                      curricular_units_2nd_sem_enrolled == 0, 1, 0)
+    )
+  
+  # 6. Taking a Break
+  # Students who had no enrollment in the second semester
+  data <- data %>%
+    mutate(
+      taking_a_break = ifelse(curricular_units_2nd_sem_enrolled == 0, 1, 0)
+    )
+  
+  # 7. Hard Courses
+  # Students who had a high number of evaluations in the 1st semester
+  data <- data %>%
+    mutate(
+      hard_courses = ifelse(curricular_units_1st_sem_evaluations > 10, 1, 0)
+    )
+  
+  # 8. Graduates Earning Zero Credits
+  # Feature for students earning zero credits in the 1st or 2nd semester
+  # while having graduated (target == 3)
+  data <- data %>%
+    mutate(
+      zero_credits_graduated = ifelse(target == 3 & 
+                                        (curricular_units_1st_sem_credited == 0 |
+                                           curricular_units_2nd_sem_credited == 0), 1, 0)
+    )
+  
+  return(data)
+}
+
+# Apply the feature engineering function to traindata
+traindata <- feature_engineering(traindata)
+
+# Display the first few rows of the updated dataset
+head(traindata)
 
 
 
 
+################################################################################
+# Validate Feature Development
 
 
-
-
-
-
-
-
-
+ncol(traindata)
 
 
 
@@ -551,9 +705,10 @@ variable_table %>%
 
 
 # Limitations
- # This data doesnt include year over year data resulting in limited conclusion ability based
+ # This data doesn't include year over year data resulting in limited conclusion ability based
   # on annual distribution of enrolled, graduate, and drop out.
-
+  # don't know the university? maybe we do? If we don't then we don't know what fianncial support looks like (maybe future direction)
+  # Don't know which subjects and course
 
 
 
