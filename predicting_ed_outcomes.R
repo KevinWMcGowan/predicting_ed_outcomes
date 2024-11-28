@@ -29,7 +29,7 @@ lapply(packages, library, character.only = TRUE)
 ################################################################################
 # Set up the file paths for the data files
 data_path <- here("data", "data.csv")
-variable_table_path <- here("data", "variable_table.csv")
+variable_table_path <- here("data", "variable_table1.csv")
 
 # Check if the file exists in the expected location
 if (!file.exists(data_path)) {
@@ -37,11 +37,22 @@ if (!file.exists(data_path)) {
        Please ensure the file is placed in the 'data' folder inside the 'predicting_ed_outcomes' repository.")
 }
 
-# Load the dataset
+# Load the datasets
 data <- read.csv(data_path, header = TRUE, sep = ";")
-variable_table <- read.csv(variable_table_path, header = TRUE)
+variable_table <- read_csv(variable_table_path)
+
+view(variable_table)
+################################################################################
+# Create a look up table for referenceing
+################################################################################
+
+# Create a lookup table with variable names and descriptions
+lookup_table <- variable_table %>%
+  select(`Variable Name`, Description) %>%
+  rename(Column = `Variable Name`)
+
+# Display the lookup table
+lookup_table
 
 
-################################################################################
-# Download data
-################################################################################
+
