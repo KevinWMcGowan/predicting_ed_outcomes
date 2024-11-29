@@ -266,11 +266,11 @@ print(formula_train)
 
 # Perform linear regression
 value1 <- lm(formula_train, data = traindata)
-summary(value1)
+summary(value1)#prolly don't need this summary... chatgpt help me make sense of this summary
 
 # Visualize the coefficients
 regression_plot<-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
-regression_plot<-
+regression_plot
 # The coefficient plot above highlights variables that are strongly predictive 
 # of the target outcome, as well as those with wide error margins crossing zero, 
 # indicating they may have little to no effect.
@@ -307,7 +307,7 @@ continuous_vars <- c("admission_grade", "curricular_units_1st_sem_grade", "gdp")
 
 ######################################
 # Binary variables
-view(variable_table)
+#view(variable_table)
 # View descriptions for binary variables
 
 # Select specific rows and print only the Variable_Name and Description columns
@@ -315,7 +315,7 @@ variable_table %>%
   slice(c(14:19, 21)) %>%  # Select rows 14 to 19 and 21
   select(Variable_Name, Description) %>%  # Select specific columns
   print()
-# 1 = yes & 0 = no for binary values
+# 1 = yes & 0 = no for binary values # USE CAT FOR FULL PRINT
 
 
 # Prepare the data for plotting
@@ -699,48 +699,65 @@ cat(description_text)
 # Above shows that out of 17 courses and 3540 students, the majority (17%) are in the nursing program
 # 8.5% in Management, 8% in social services, and ~8%  in both veterinary nursing and Journalism and communication.
 # The rst of the course have 6% - .2% each. These results suggest a good distribution across fields of study.
+
 ################################################################################
 #Feature Development
 ################################################################################
+
 #- create a owe money feature of students who both are debtor = 1 and tuition feeds up to date = 0 
 # create students who failed first semester with 1st Semester curricular_units_1st_sem_grade  =>10 (50% of 20) 
 # students who failed both first and second semester 2nd Semester curricular_units_2nd_sem_grade  =>10 & 1st Semester curricular_units_1st_sem_grade  =>10
 # under enrolled
-# create course ID to sem grade, and sem credited to get idea of harder courses. maybe even discouraging courses when taken first semester and then lead to student enrollment of 0 the next semester.
-# takin a break students who 2nd semester unit enrollment enroll = 0
+# create course ID to semester grade, and semester units credited to get idea of harder courses. maybe even discouraging courses when taken first semester and then lead to student enrollment of 0 the next semester.
+# taking a break students who 2nd semester unit enrollment enroll = 0
 #hard courses could also be a feature where user had high number of unit 1st semeseter evalautions
-# gradautes could be earning 0 credits  in first or second semester because they are graduated. Maybe this could be a feature 
-# Define a feature engineering function
-feature_engineering <- function(data) {
-  # Make a copy of the data to preserve the original
-  data <- data %>% mutate(across(everything(), as.numeric, .names = "numeric_{col}"))
+# graduates could be earning 0 credits  in first or second semester because they are graduated. Maybe this could be a feature 
+
+# Define a feature engineering function:
+# Define a feature engineering function:
+combined_feature_engineering <- function(data) {
   
-  # 1. Owe Money Feature
+  # 1. Grading Scale Mapping (Numeric Categories)
+  map_grades_to_category <- function(grade) {
+    case_when(
+      grade >= 18 & grade <= 20 ~ 5,  # Very Good with Distinction
+      grade >= 16 & grade < 18 ~ 4,   # Very Good
+      grade >= 14 & grade < 16 ~ 3,   # Good
+      grade >= 10 & grade < 14 ~ 2,   # Sufficient
+      grade >= 7 & grade < 10 ~ 1,    # Poor
+      grade < 7 ~ 0,                  # Very Poor
+      TRUE ~ NA_real_                 # Handle missing values
+    ) 
+  }
+  data <- data %>%
+    mutate(
+      grade_category_1st_sem = map_grades_to_category(curricular_units_1st_sem_grade),
+      grade_category_2nd_sem = map_grades_to_category(curricular_units_2nd_sem_grade)
+    ) # The grade_categories features use the Portuguese grading standards to define clear pass and fail, along with exemplary performance.
+  
+  # 2. Owe Money Feature
   data <- data %>%
     mutate(
       owe_money = ifelse(debtor == 1 & tuition_fees_up_to_date == 0, 1, 0)
-    )
+    ) # The owe_money feature attempts to create meaning out of students who are financially strained vs. those who are not.
   
-  # 2. Failed First Semester
+  # 3. Failing Features
   data <- data %>%
     mutate(
-      failed_1st_semester = ifelse(curricular_units_1st_sem_grade <= 10, 1, 0)
-    )
-  
-  # 3. Failed Both Semesters
-  data <- data %>%
-    mutate(
-      failed_both_semesters = ifelse(curricular_units_1st_sem_grade <= 10 & 
-                                       curricular_units_2nd_sem_grade <= 10, 1, 0)
-    )
+      failing_first_sem = ifelse(grade_category_1st_sem <= 1, 1, 0),
+      failing_both_semesters = ifelse(grade_category_1st_sem <= 1 & grade_category_2nd_sem <= 1, 1, 0)
+    ) # These failing semester features define class failure vs. pass by using the grade_category in feature #1.
   
   # 4. Under-Enrolled
   data <- data %>%
     mutate(
-      under_enrolled_1st_sem = ifelse(curricular_units_1st_sem_enrolled < 11, 1, 0),
+      under_enrolled_1st_sem = ifelse(curricular_units_1st_sem_enrolled < 10, 1, 0),
       under_enrolled_2nd_sem = ifelse(curricular_units_2nd_sem_enrolled < 10, 1, 0),
       under_enrolled_both_sem = ifelse(under_enrolled_1st_sem == 1 & under_enrolled_2nd_sem == 1, 1, 0)
-    )
+    ) # The under-enrolled feature identifies students who are off track for graduating on time by 
+  # using a threshold of 50% of the required pace. To graduate in 4 years with 180 credits, 
+  # students need 22.5 credits per semester. This feature flags students enrolled in fewer than 
+  # half that amount (10 credits in the 1st semester and 2nd semester).
   
   # 5. Course Difficulty
   course_difficulty <- data %>%
@@ -749,101 +766,86 @@ feature_engineering <- function(data) {
       avg_grade_1st_sem = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
       std_grade_1st_sem = sd(curricular_units_1st_sem_grade, na.rm = TRUE),
       avg_grade_2nd_sem = mean(curricular_units_2nd_sem_grade, na.rm = TRUE),
-      std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE)
+      std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE),
+      .groups = "drop"
     ) %>%
     mutate(
       overall_avg_grade = (avg_grade_1st_sem + avg_grade_2nd_sem) / 2,
       overall_std_grade = (std_grade_1st_sem + std_grade_2nd_sem) / 2
     )
-  
   data <- data %>%
-    left_join(course_difficulty, by = "course")
+    left_join(course_difficulty, by = "course") # The course difficulty feature quantifies how challenging a course is based on student grades. 
   
   # 6. Hard Courses
   data <- data %>%
     mutate(
       hard_courses = ifelse(curricular_units_1st_sem_evaluations > 10, 1, 0)
-    )
+    ) # Hard courses assume that many evaluations/tests make a course harder.
   
-  # 7. Zero Credits for Graduates
-  data <- data %>%
-    mutate(
-      zero_credits_graduate = ifelse(curricular_units_1st_sem_credited == 0 & 
-                                       curricular_units_2nd_sem_credited == 0 & 
-                                       target == 3, 1, 0)
-    )
-  
-  # 8. Break Between Semesters
+  # 7. Break Between Semesters
   data <- data %>%
     mutate(
       break_between_semesters = ifelse(curricular_units_1st_sem_enrolled > 0 & 
                                          curricular_units_2nd_sem_enrolled == 0, 1, 0)
-    )
+    ) # Students enrolled in units in the first semester but not the next might be taking a break or dropping out.
   
-  # 9. Discouraging Courses
+  # 8. Discouraging Courses
+  course_grade_summary <- data %>%
+    group_by(course) %>%
+    summarize(
+      avg_course_grade = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
+      .groups = "drop"
+    )
   data <- data %>%
+    left_join(course_grade_summary, by = "course") %>%
     mutate(
-      discouraging_courses = ifelse(overall_avg_grade < 10 & curricular_units_2nd_sem_enrolled == 0, 1, 0)
-    )
+      discouraging_courses = ifelse(avg_course_grade < 10, 1, 0)
+    ) # Courses with low average grades (below the passing threshold of 10) are flagged as discouraging.
   
-  # 10. Historical Success
+  # 9. Historical Success
   data <- data %>%
     mutate(
       normalized_previous_grade = previous_qualification_grade / 200,
-      strong_historical_success = ifelse(normalized_previous_grade > 0.75, 1, 0),
-      weak_historical_success = ifelse(normalized_previous_grade < 0.5, 1, 0)
-    )
+      strong_historical_success = ifelse(normalized_previous_grade >= 0.663, 1, 0),
+      weak_historical_success = ifelse(normalized_previous_grade < 0.5966, 1, 0)
+    ) # Uses normalized thresholds to categorize students with strong or weak prior success.
   
-  # 11. Non-Portuguese Nationality
+  # 10. Grade-Based Summaries
   data <- data %>%
     mutate(
-      non_portuguese = ifelse(nacionality != 1, 1, 0)
+      average_grade = (curricular_units_1st_sem_grade + curricular_units_2nd_sem_grade) / 2,
+      semester_grade_gap = curricular_units_2nd_sem_grade - curricular_units_1st_sem_grade
+    ) # Summarizes overall grade performance and tracks grade changes between semesters.
+  
+  # 11. Prior Education Group Distributions
+  prior_education_summary <- data %>%
+    group_by(previous_qualification) %>%
+    summarize(
+      prior_avg_grade_1st_sem = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
+      prior_std_grade_1st_sem = sd(curricular_units_1st_sem_grade, na.rm = TRUE),
+      prior_avg_grade_2nd_sem = mean(curricular_units_2nd_sem_grade, na.rm = TRUE),
+      prior_std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE),
+      .groups = "drop"
     )
+  data <- data %>%
+    left_join(prior_education_summary, by = "previous_qualification") 
+  # Tracks grade patterns for students by prior education level.
   
   return(data)
 }
-####################work on following comments and features and security of avoiding data leakage on this enginneering function
 
-# Apply the feature engineering function to traindata (make sure this is just a general function that doen't accidently pull the data variable we have saved above that holds our target and final hold out split.)
-traindata <- feature_engineering(traindata)
 
-# Display the first few rows of the updated dataset
-head(traindata)
+### Separately apply the combined function to the training data and test data
+# Apply to training data
+traindata <- combined_feature_engineering(traindata, is_training = TRUE)
 
-################add grading scale to the above somehow:
-# Numeric mapping function for grading categories
-map_grades_to_numeric <- function(grade) {
-  case_when(
-    grade >= 18 & grade <= 20 ~ 5,  # Very Good with Distinction
-    grade >= 16 & grade < 18 ~ 4,   # Very Good
-    grade >= 14 & grade < 16 ~ 3,   # Good
-    grade >= 10 & grade < 14 ~ 2,   # Sufficient
-    grade >= 7 & grade < 10 ~ 1,    # Poor
-    grade < 7 ~ 0,                  # Very Poor
-    TRUE ~ NA_real_                 # Handle missing values
-  )
-}
-
-# Apply the mapping to the grade columns
-traindata <- traindata %>%
-  mutate(
-    numeric_grade_1st_sem = map_grades_to_numeric(curricular_units_1st_sem_grade),
-    numeric_grade_2nd_sem = map_grades_to_numeric(curricular_units_2nd_sem_grade)
-  )
-
-# Update existing grade-based features
-traindata <- traindata %>%
-  mutate(
-    failing_first_sem = ifelse(numeric_grade_1st_sem <= 1, 1, 0),
-    failing_both_semesters = ifelse(numeric_grade_1st_sem <= 1 & numeric_grade_2nd_sem <= 1, 1, 0),
-    weighted_grade_score = numeric_grade_1st_sem * 0.5 + numeric_grade_2nd_sem * 0.5
-  )
-########################
+# Apply to test data
+testdata <- combined_feature_engineering(testdata, is_training = FALSE)
 
 
 ################################################################################
 # Validate Feature Development
-
+################################################################################
 
 ncol(traindata)
 head(traindata)
@@ -855,7 +857,7 @@ head(traindata)
 ################################################################################
 # Explain Feature Logic
 
-#5. Courwe Difficulty: High evaluations might indicate a rigorous or time-consuming course, potentially contributing to student performance outcomes (e.g., dropping out or succeeding).
+#5. Course Difficulty: High evaluations might indicate a rigorous or time-consuming course, potentially contributing to student performance outcomes (e.g., dropping out or succeeding).
 
 
 
