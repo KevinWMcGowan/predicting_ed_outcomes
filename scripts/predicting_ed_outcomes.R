@@ -221,7 +221,14 @@ trainindex <- createDataPartition(data$target, p = .8,
 traindata <- data[trainindex,]
 testdata  <- data[-trainindex,]
 
+##### count NAs
+# Count total NAs in traindata
+total_nas_traindata <- sum(is.na(traindata))
+cat("Total NAs in traindata:", total_nas_traindata, "\n")
 
+# Count total NAs in testdata
+total_nas_testdata <- sum(is.na(testdata))
+cat("Total NAs in testdata:", total_nas_testdata, "\n")
 ################################################################################
 # Exploratory Data Analysis (ENSURE HENCE FORTH NO DATA IS USED!!!!! ONLY TRAIN DATA)
 ################################################################################
@@ -708,7 +715,6 @@ cat(description_text)
 # graduates could be earning 0 credits  in first or second semester because they are graduated. Maybe this could be a feature 
 
 # Define a feature engineering function:
-# Define a feature engineering function:
 combined_feature_engineering <- function(data) {
   
   # 1. Grading Scale Mapping (Numeric Categories)
@@ -775,15 +781,8 @@ combined_feature_engineering <- function(data) {
     mutate(
       hard_courses = ifelse(curricular_units_1st_sem_evaluations > 10, 1, 0)
     ) # Hard courses assume that many evaluations/tests make a course harder.
-  
-  # 7. Break Between Semesters
-  data <- data %>%
-    mutate(
-      break_between_semesters = ifelse(curricular_units_1st_sem_enrolled > 0 & 
-                                         curricular_units_2nd_sem_enrolled == 0, 1, 0)
-    ) # Students enrolled in units in the first semester but not the next might be taking a break or dropping out.
-  
-  # 8. Discouraging Courses
+
+  # 7. Discouraging Courses
   course_grade_summary <- data %>%
     group_by(course) %>%
     summarize(
@@ -796,7 +795,7 @@ combined_feature_engineering <- function(data) {
       discouraging_courses = ifelse(avg_course_grade < 10, 1, 0)
     ) # Courses with low average grades (below the passing threshold of 10) are flagged as discouraging.
   
-  # 9. Historical Success
+  # 8. Historical Success
   data <- data %>%
     mutate(
       normalized_previous_grade = previous_qualification_grade / 200,
@@ -804,14 +803,14 @@ combined_feature_engineering <- function(data) {
       weak_historical_success = ifelse(normalized_previous_grade < 0.5966, 1, 0)
     ) # Uses normalized thresholds to categorize students with strong or weak prior success.
   
-  # 10. Grade-Based Summaries
+  # 9. Grade-Based Summaries
   data <- data %>%
     mutate(
       average_grade = (curricular_units_1st_sem_grade + curricular_units_2nd_sem_grade) / 2,
       semester_grade_gap = curricular_units_2nd_sem_grade - curricular_units_1st_sem_grade
     ) # Summarizes overall grade performance and tracks grade changes between semesters.
   
-  # 11. Prior Education Group Distributions
+  # 10. Prior Education Group Distributions
   prior_education_summary <- data %>%
     group_by(previous_qualification) %>%
     summarize(
@@ -838,19 +837,109 @@ testdata <- combined_feature_engineering(testdata)
 
 
 ################################################################################
-## Validate Feature Development
+## Validate Feature Development on Training Data
 ################################################################################
-
 ncol(traindata)
-head(traindata)
+colnames(traindata)
+
+validate_combined_features <- function(data) {
+  # 1. Count Total NAs in the Dataset
+  total_na <- sum(is.na(data))
+  cat("Total NA Count in Dataset:", total_na, "\n")
+  
+  # 2. Count NAs per Feature
+  na_counts <- data %>%
+    summarise(across(everything(), ~ sum(is.na(.)))) %>%
+    pivot_longer(everything(), names_to = "Feature", values_to = "NA_Count") %>%
+    arrange(desc(NA_Count))
+  
+  print("NA Counts for Each Feature:")
+  print(na_counts)
+  
+  # 3. Identify Features with 100% 0s or 1s
+  constant_features <- data %>%
+    summarise(across(everything(), ~ all(. == 0, na.rm = TRUE) | all(. == 1, na.rm = TRUE))) %>%
+    pivot_longer(everything(), names_to = "Feature", values_to = "Is_Constant") %>%
+    filter(Is_Constant == TRUE)
+  
+  if (nrow(constant_features) > 0) {
+    cat("Features with 100% 0s or 1s:\n")
+    print(constant_features$Feature)
+  } else {
+    cat("No features have 100% 0s or 1s.\n")
+  }
+  
+  # 4. Visualize Key Features
+  key_features <- c(
+    "grade_category_1st_sem", "grade_category_2nd_sem", "owe_money", 
+    "failing_first_sem", "failing_both_semesters", "under_enrolled_1st_sem", 
+    "under_enrolled_2nd_sem", "under_enrolled_both_sem", "hard_courses", 
+    "discouraging_courses", "strong_historical_success", "weak_historical_success", 
+    "average_grade", "semester_grade_gap"
+  )
+  
+  feature_plots <- list()
+  for (feature in key_features) {
+    if (feature %in% names(data)) {
+      p <- ggplot(data, aes_string(x = feature)) +
+        geom_bar(fill = "steelblue", color = "black") +
+        labs(
+          title = paste("Distribution of", feature),
+          x = feature,
+          y = "Count"
+        ) +
+        theme_minimal()
+      feature_plots[[feature]] <- p
+    }
+  }
+  
+  # Return validation results
+  return(list(
+    na_counts = na_counts,
+    total_na = total_na,
+    constant_features = constant_features,
+    feature_plots = feature_plots
+  ))
+}
+# Apply the updated validation function
+validation_results <- validate_combined_features(traindata)
+
+# Total NAs in the dataset
+cat("Total NA Count:", validation_results$total_na, "\n")
+
+# NA counts per feature
+print(validation_results$na_counts)
+# The dataset only has 2 NAs. These two instances can be removed for simplicity.
+
+# Features with 100% 0s or 1s
+if (nrow(validation_results$constant_features) > 0) {
+  cat("Features with constant values (100% 0s or 1s):\n")
+  print(validation_results$constant_features$Feature)
+} else {
+  cat("No features have 100% 0s or 1s.\n")
+}
+# no features appear to have no predictive value by being entirely 0 or 1
+
+# View the plots for key features
+for (feature_name in names(validation_results$feature_plots)) {
+  print(validation_results$feature_plots[[feature_name]])
+}
 
 
+# remove the 2 NAs:
+# Remove rows with NA values from the training and test datasets
+traindata <- traindata %>% drop_na()
+# Revalidate the datasets to confirm no remaining NAs
+cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), "\n")
 
+#testdata <- testdata %>% drop_na() #### ADD THIS TO TEST SET CLEANING IN FUTURE SECTION IF IT DOESNT RUN WITHOUT IT
+# Revalidate the dataset to confirm no remaining NAs
+#cat("Total NA Count in Test Dataset after removal:", sum(is.na(testdata)), "\n")
 
 
 ################################################################################
 ## Choosing Classification 
-
+################################################################################
 
 
 
