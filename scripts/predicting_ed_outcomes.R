@@ -590,7 +590,7 @@ print(dropout_with_diff_summary)
 
 
 ################################################################################
-# Categorical variables, specifically nationality[8], Prvious education, previous education grade, degree programs, and courses
+# Categorical variables, specifically nationality[8], Previous education, previous education grade, degree programs, and courses
 
 ### Nationality
 # Summarize nationality distribution in the dataset
@@ -666,12 +666,6 @@ description_text <- variable_description$Description
 cat(description_text)
 # The average grade coming into university was about 133/200, with a standard deviation of 13.
 
-
-### Degree Program
-# Looking into the distribution of study in the sample could give insight to where students perform high or low. However, 
-# a degree feature does not exist. Instead, course is provided which will supply some insight.
-
-
 ### Courses
 # Investigating the distribution of courses [row 4] taken in the sample will contribute to understanding the study and where possible student
 # support is need
@@ -701,7 +695,7 @@ cat(description_text)
 # The rst of the course have 6% - .2% each. These results suggest a good distribution across fields of study.
 
 ################################################################################
-#Feature Development
+## Feature Development
 ################################################################################
 
 #- create a owe money feature of students who both are debtor = 1 and tuition feeds up to date = 0 
@@ -837,14 +831,14 @@ combined_feature_engineering <- function(data) {
 
 ### Separately apply the combined function to the training data and test data
 # Apply to training data
-traindata <- combined_feature_engineering(traindata, is_training = TRUE)
+traindata <- combined_feature_engineering(traindata)
 
 # Apply to test data
-testdata <- combined_feature_engineering(testdata, is_training = FALSE)
+testdata <- combined_feature_engineering(testdata)
 
 
 ################################################################################
-# Validate Feature Development
+## Validate Feature Development
 ################################################################################
 
 ncol(traindata)
@@ -855,9 +849,7 @@ head(traindata)
 
 
 ################################################################################
-# Explain Feature Logic
-
-#5. Course Difficulty: High evaluations might indicate a rigorous or time-consuming course, potentially contributing to student performance outcomes (e.g., dropping out or succeeding).
+## Choosing Classification 
 
 
 
