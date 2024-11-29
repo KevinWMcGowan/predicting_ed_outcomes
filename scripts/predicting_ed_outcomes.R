@@ -606,8 +606,10 @@ print(nationality_summary)
 # Pull description for nationality (row 8) in the variable table
 variable_description <- variable_table %>%
   slice(8) %>% 
-  select(Variable_Name, Description)
-print(variable_description)
+  select(Variable_Name, Description) %>%
+  mutate(Description = str_wrap(Description, width = 80)) 
+description_text <- variable_description$Description
+cat(description_text)
 # Above shows over 97% of the dataset is Portuguese. An appropriate finding for a Portugal based university.
 
 
@@ -625,8 +627,10 @@ print(previous_education_summary)
 # Pull description for nationality (row 6) in the variable table
 variable_description <- variable_table %>%
   slice(6) %>% 
-  select(Variable_Name, Description)
-print(variable_description)
+  select(Variable_Name, Description) %>%
+  mutate(Description = str_wrap(Description, width = 80)) 
+description_text <- variable_description$Description
+cat(description_text)
 # Result above show that 84% of students in the sample have recently come from secondary education (1) AKA High Schools. 
 # suggesting the sample describes largely Freshman and Sophomore students who had not had other more recent achievements, like the 5% with Technological specialization course (39).
 # notably,~4%, the third largest group, is coming with 9,10,11th grade completed, but not a secondary level degree. Suggesting these students are taking 
@@ -653,22 +657,48 @@ grade_summary <- traindata %>%
     SD_Grade = sd(previous_qualification_grade, na.rm = TRUE)
   )
 print(grade_summary)
-# Pull description for nationality (row 7) in the variable table
+# Pull description for previous education grade (row 7) in the variable table
 variable_description <- variable_table %>%
   slice(7) %>% 
-  select(Variable_Name, Description)
-print(variable_description)
+  select(Variable_Name, Description) %>%
+  mutate(Description = str_wrap(Description, width = 80)) 
+description_text <- variable_description$Description
+cat(description_text)
 # The average grade coming into university was about 133/200, with a standard deviation of 13.
 
 
 ### Degree Program
-# Looking into the distribution of study in the sample could give insight to where students perform high or low.
+# Looking into the distribution of study in the sample could give insight to where students perform high or low. However, 
+# a degree feature does not exist. Instead, course is provided which will supply some insight.
 
 
 ### Courses
 # Investigating the distribution of courses [row 4] taken in the sample will contribute to understanding the study and where possible student
 # support is need
-
+# Summarize the course variable
+course_summary <- traindata %>%
+  group_by(course) %>%
+  summarize(
+    Count = n(),
+    Percentage = (n() / nrow(traindata)) * 100
+  ) %>%
+  arrange(desc(Percentage)) # Sort by Percentage in descending order
+print(course_summary)
+# Sum the Count column
+total_students <- course_summary %>%
+  summarize(Total_Count = sum(Count))
+print(total_students)
+# Pull description for course (row 4) in the variable table
+variable_description <- variable_table %>%
+  slice(4) %>% 
+  select(Variable_Name, Description) %>%
+  mutate(Description = str_wrap(Description, width = 80)) # Adjust width as needed
+# Convert to data frame and print the description using cat
+description_text <- variable_description$Description
+cat(description_text)
+# Above shows that out of 17 courses and 3540 students, the majority (17%) are in the nursing program
+# 8.5% in Management, 8% in social services, and ~8%  in both veterinary nursing and Journalism and communication.
+# The rst of the course have 6% - .2% each. These results suggest a good distribution across fields of study.
 ################################################################################
 #Feature Development
 ################################################################################
@@ -686,69 +716,129 @@ feature_engineering <- function(data) {
   data <- data %>% mutate(across(everything(), as.numeric, .names = "numeric_{col}"))
   
   # 1. Owe Money Feature
-  # Students who are debtors (debtor = 1) and have tuition fees not up to date (tuition_fees_up_to_date = 0)
   data <- data %>%
     mutate(
       owe_money = ifelse(debtor == 1 & tuition_fees_up_to_date == 0, 1, 0)
     )
   
   # 2. Failed First Semester
-  # Students with 1st semester grade less than or equal to 10 (50% of 20)
   data <- data %>%
     mutate(
       failed_1st_semester = ifelse(curricular_units_1st_sem_grade <= 10, 1, 0)
     )
   
   # 3. Failed Both Semesters
-  # Students with grades <= 10 in both semesters
   data <- data %>%
     mutate(
-      failed_both_semesters = ifelse(curricular_units_1st_sem_grade <= 10 &
+      failed_both_semesters = ifelse(curricular_units_1st_sem_grade <= 10 & 
                                        curricular_units_2nd_sem_grade <= 10, 1, 0)
     )
   
-  # 4. Under-Enrolled #check protugl for this standard
-  # Students enrolled in fewer than 4 units in 1st or 2nd semester
+  # 4. Under-Enrolled
   data <- data %>%
     mutate(
-      under_enrolled = ifelse(curricular_units_1st_sem_enrolled < 4 |
-                                curricular_units_2nd_sem_enrolled < 4, 1, 0)
+      under_enrolled_1st_sem = ifelse(curricular_units_1st_sem_enrolled < 11, 1, 0),
+      under_enrolled_2nd_sem = ifelse(curricular_units_2nd_sem_enrolled < 10, 1, 0),
+      under_enrolled_both_sem = ifelse(under_enrolled_1st_sem == 1 & under_enrolled_2nd_sem == 1, 1, 0)
     )
   
-  # 5. Course ID to Grade and Credits (Encouraging/Discouraging Courses)#use credited and enrolled for this calculation instead
-  # Generate features that correlate course difficulty with grades and credits
-  data <- data %>%
+  # 5. Course Difficulty
+  course_difficulty <- data %>%
+    group_by(course) %>%
+    summarize(
+      avg_grade_1st_sem = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
+      std_grade_1st_sem = sd(curricular_units_1st_sem_grade, na.rm = TRUE),
+      avg_grade_2nd_sem = mean(curricular_units_2nd_sem_grade, na.rm = TRUE),
+      std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE)
+    ) %>%
     mutate(
-      course_difficulty_score = curricular_units_1st_sem_grade / curricular_units_1st_sem_credited,
-      discouraging_courses = ifelse(course_difficulty_score < 1 &
-                                      curricular_units_2nd_sem_enrolled == 0, 1, 0)
+      overall_avg_grade = (avg_grade_1st_sem + avg_grade_2nd_sem) / 2,
+      overall_std_grade = (std_grade_1st_sem + std_grade_2nd_sem) / 2
     )
   
-  # 6. Taking a Break
-  # Students who had no enrollment in the second semester
   data <- data %>%
-    mutate(
-      taking_a_break = ifelse(curricular_units_2nd_sem_enrolled == 0, 1, 0)
-    )
+    left_join(course_difficulty, by = "course")
   
-  # 7. Hard Courses#but got pasing grade >=10 in semester 1
-  # Students who had a high number of evaluations in the 1st semester
+  # 6. Hard Courses
   data <- data %>%
     mutate(
       hard_courses = ifelse(curricular_units_1st_sem_evaluations > 10, 1, 0)
     )
+  
+  # 7. Zero Credits for Graduates
+  data <- data %>%
+    mutate(
+      zero_credits_graduate = ifelse(curricular_units_1st_sem_credited == 0 & 
+                                       curricular_units_2nd_sem_credited == 0 & 
+                                       target == 3, 1, 0)
+    )
+  
+  # 8. Break Between Semesters
+  data <- data %>%
+    mutate(
+      break_between_semesters = ifelse(curricular_units_1st_sem_enrolled > 0 & 
+                                         curricular_units_2nd_sem_enrolled == 0, 1, 0)
+    )
+  
+  # 9. Discouraging Courses
+  data <- data %>%
+    mutate(
+      discouraging_courses = ifelse(overall_avg_grade < 10 & curricular_units_2nd_sem_enrolled == 0, 1, 0)
+    )
+  
+  # 10. Historical Success
+  data <- data %>%
+    mutate(
+      normalized_previous_grade = previous_qualification_grade / 200,
+      strong_historical_success = ifelse(normalized_previous_grade > 0.75, 1, 0),
+      weak_historical_success = ifelse(normalized_previous_grade < 0.5, 1, 0)
+    )
+  
+  # 11. Non-Portuguese Nationality
+  data <- data %>%
+    mutate(
+      non_portuguese = ifelse(nacionality != 1, 1, 0)
     )
   
   return(data)
 }
+####################work on following comments and features and security of avoiding data leakage on this enginneering function
 
-# Apply the feature engineering function to traindata
+# Apply the feature engineering function to traindata (make sure this is just a general function that doen't accidently pull the data variable we have saved above that holds our target and final hold out split.)
 traindata <- feature_engineering(traindata)
 
 # Display the first few rows of the updated dataset
 head(traindata)
 
+################add grading scale to the above somehow:
+# Numeric mapping function for grading categories
+map_grades_to_numeric <- function(grade) {
+  case_when(
+    grade >= 18 & grade <= 20 ~ 5,  # Very Good with Distinction
+    grade >= 16 & grade < 18 ~ 4,   # Very Good
+    grade >= 14 & grade < 16 ~ 3,   # Good
+    grade >= 10 & grade < 14 ~ 2,   # Sufficient
+    grade >= 7 & grade < 10 ~ 1,    # Poor
+    grade < 7 ~ 0,                  # Very Poor
+    TRUE ~ NA_real_                 # Handle missing values
+  )
+}
 
+# Apply the mapping to the grade columns
+traindata <- traindata %>%
+  mutate(
+    numeric_grade_1st_sem = map_grades_to_numeric(curricular_units_1st_sem_grade),
+    numeric_grade_2nd_sem = map_grades_to_numeric(curricular_units_2nd_sem_grade)
+  )
+
+# Update existing grade-based features
+traindata <- traindata %>%
+  mutate(
+    failing_first_sem = ifelse(numeric_grade_1st_sem <= 1, 1, 0),
+    failing_both_semesters = ifelse(numeric_grade_1st_sem <= 1 & numeric_grade_2nd_sem <= 1, 1, 0),
+    weighted_grade_score = numeric_grade_1st_sem * 0.5 + numeric_grade_2nd_sem * 0.5
+  )
+########################
 
 
 ################################################################################
