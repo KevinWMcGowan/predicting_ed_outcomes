@@ -269,8 +269,8 @@ value1 <- lm(formula_train, data = traindata)
 summary(value1)
 
 # Visualize the coefficients
-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
-
+regression_plot<-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
+regression_plot<-
 # The coefficient plot above highlights variables that are strongly predictive 
 # of the target outcome, as well as those with wide error margins crossing zero, 
 # indicating they may have little to no effect.
@@ -354,7 +354,7 @@ ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
 
 # The chart above shows that the vast majority of students are not debtor (don't owe money to school), nor special needs, most are male, aren't international, or scholarship holders
 # This finding warrent more digging, since the regression above found all but gender to be predictive of our target variable.
-# Below, compares the same variables against the 33 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
+# Below, compares the same variables against the 3 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
 # Prepare the data for plotting
 binary_target_data <- traindata %>%
   select(all_of(binary_vars), target) %>%
@@ -586,6 +586,89 @@ print(dropout_with_diff_summary)
 
 #COMPLETE DESCRIPTION/SUMAMRY OF FINDINGS ABOVE AND HOW THEY SUGGEST FEATURE DEVELOPMENT
 # The table above shows clearly the difference in 
+
+
+
+################################################################################
+# Categorical variables, specifically nationality[8], Prvious education, previous education grade, degree programs, and courses
+
+### Nationality
+# Summarize nationality distribution in the dataset
+nationality_summary <- traindata %>%
+  group_by(nacionality) %>%
+  summarize(
+    count = n(),
+    percentage = (n() / nrow(traindata)) * 100
+  ) %>%
+  arrange(desc(count))
+print(nationality_summary)
+
+# Pull description for nationality (row 8) in the variable table
+variable_description <- variable_table %>%
+  slice(8) %>% 
+  select(Variable_Name, Description)
+print(variable_description)
+# Above shows over 97% of the dataset is Portuguese. An appropriate finding for a Portugal based university.
+
+
+### Previous Educational Achievement
+# Summarize previous_qualification (index 6)
+previous_education_summary <- traindata %>%
+  group_by(previous_qualification) %>%
+  summarize(
+    Count = n(),
+    Percentage = (n() / nrow(traindata)) * 100
+  ) %>%
+  arrange(desc(Count))
+print(previous_education_summary)
+
+# Pull description for nationality (row 6) in the variable table
+variable_description <- variable_table %>%
+  slice(6) %>% 
+  select(Variable_Name, Description)
+print(variable_description)
+# Result above show that 84% of students in the sample have recently come from secondary education (1) AKA High Schools. 
+# suggesting the sample describes largely Freshman and Sophomore students who had not had other more recent achievements, like the 5% with Technological specialization course (39).
+# notably,~4%, the third largest group, is coming with 9,10,11th grade completed, but not a secondary level degree. Suggesting these students are taking 
+# college credits. This group may perform better or worse than others and could be a useful feature. Below confirms the age of the sample is aligns with first and second year univeristy students:
+# Summarize age_at_enrollment
+age_summary <- traindata %>%
+  group_by(age_at_enrollment) %>%
+  summarize(
+    Count = n(),
+    Percentage = (n() / nrow(traindata)) * 100
+  ) %>%
+  arrange(desc(Percentage))
+print(age_summary)
+# about half the sample is 18 or 19, with 80% falling between 18 and 27.
+
+### Previous Education Grade
+# Summarize previous_qualification_grade (index 7)
+grade_summary <- traindata %>%
+  summarize(
+    Min_Grade = min(previous_qualification_grade, na.rm = TRUE),
+    Max_Grade = max(previous_qualification_grade, na.rm = TRUE),
+    Mean_Grade = mean(previous_qualification_grade, na.rm = TRUE),
+    Median_Grade = median(previous_qualification_grade, na.rm = TRUE),
+    SD_Grade = sd(previous_qualification_grade, na.rm = TRUE)
+  )
+print(grade_summary)
+# Pull description for nationality (row 7) in the variable table
+variable_description <- variable_table %>%
+  slice(7) %>% 
+  select(Variable_Name, Description)
+print(variable_description)
+# The average grade coming into university was about 133/200, with a standard deviation of 13.
+
+
+### Degree Program
+# Looking into the distribution of study in the sample could give insight to where students perform high or low.
+
+
+### Courses
+# Investigating the distribution of courses [row 4] taken in the sample will contribute to understanding the study and where possible student
+# support is need
+
 ################################################################################
 #Feature Development
 ################################################################################
@@ -624,7 +707,7 @@ feature_engineering <- function(data) {
                                        curricular_units_2nd_sem_grade <= 10, 1, 0)
     )
   
-  # 4. Under-Enrolled
+  # 4. Under-Enrolled #check protugl for this standard
   # Students enrolled in fewer than 4 units in 1st or 2nd semester
   data <- data %>%
     mutate(
@@ -632,7 +715,7 @@ feature_engineering <- function(data) {
                                 curricular_units_2nd_sem_enrolled < 4, 1, 0)
     )
   
-  # 5. Course ID to Grade and Credits (Encouraging/Discouraging Courses)
+  # 5. Course ID to Grade and Credits (Encouraging/Discouraging Courses)#use credited and enrolled for this calculation instead
   # Generate features that correlate course difficulty with grades and credits
   data <- data %>%
     mutate(
@@ -648,21 +731,12 @@ feature_engineering <- function(data) {
       taking_a_break = ifelse(curricular_units_2nd_sem_enrolled == 0, 1, 0)
     )
   
-  # 7. Hard Courses
+  # 7. Hard Courses#but got pasing grade >=10 in semester 1
   # Students who had a high number of evaluations in the 1st semester
   data <- data %>%
     mutate(
       hard_courses = ifelse(curricular_units_1st_sem_evaluations > 10, 1, 0)
     )
-  
-  # 8. Graduates Earning Zero Credits
-  # Feature for students earning zero credits in the 1st or 2nd semester
-  # while having graduated (target == 3)
-  data <- data %>%
-    mutate(
-      zero_credits_graduated = ifelse(target == 3 & 
-                                        (curricular_units_1st_sem_credited == 0 |
-                                           curricular_units_2nd_sem_credited == 0), 1, 0)
     )
   
   return(data)
@@ -682,6 +756,16 @@ head(traindata)
 
 
 ncol(traindata)
+head(traindata)
+
+
+
+
+
+################################################################################
+# Explain Feature Logic
+
+#5. Courwe Difficulty: High evaluations might indicate a rigorous or time-consuming course, potentially contributing to student performance outcomes (e.g., dropping out or succeeding).
 
 
 
@@ -694,21 +778,22 @@ ncol(traindata)
 
 
 
+# Conclusion
 
 
 
-
-
-
-
-
-
-
-# Limitations
+## Limitations
  # This data doesn't include year over year data resulting in limited conclusion ability based
   # on annual distribution of enrolled, graduate, and drop out.
   # don't know the university? maybe we do? If we don't then we don't know what fianncial support looks like (maybe future direction)
-  # Don't know which subjects and course
+  # Don't know for certain without further digging which courses belong to which degree program. Making this connection would contribute to knowing the unique suport needs of each degree path.
+
+## Future Directions
+  # There were many variables that were not further explored because their predictability in their current form wasn't strong enough to warent immediate feature development.
+  # For instance, all the variables that feel along 0 in the plot below were largely left alone, leading to opportunity to develop new feature not yet explored.
+  # Specially, creating demographic features that describe parent occupation and previsou education acheivement (qualification) could increase or decrease liklihood of success in UNiversity.
+regression_plot
+
 
 
 
