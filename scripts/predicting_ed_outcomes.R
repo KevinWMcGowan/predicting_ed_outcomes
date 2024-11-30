@@ -57,7 +57,7 @@ variable_table <- read_csv(variable_table_path)
 
 head(data)
 head(variable_table)
-
+unique(data$Target)
 ################################################################################
 # Clean the datasets
 ################################################################################
@@ -151,7 +151,7 @@ cat("\nVariables in `variable_table` but not in `data` after final cleaning:\n")
 print(non_matching_in_variable_table)
 
 #The above shows that all variable names are now matching.
-
+#unique(data$target)
 
 ################################################################################
 ## Set Variable Types
@@ -189,15 +189,14 @@ data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_
 # Verify the change for `curricular_units_1st_sem_grade`
 str(data[c("curricular_units_1st_sem_grade")])
 # This ensures that the column is now stored as integers, aligning with the expected variable type in the lookup table.
-
-# Encode `target` as numeric
-# Convert `target` into a factor if it isn't already
-data$target <- as.factor(data$target)
-
+"Dropout"  "Graduate" "Enrolled"
 # Replace the `target` variable with its numeric representation
-data$target <- as.numeric(data$target)
-
-# Verify the change for `target`
+# Convert `target` back to a factor with appropriate levels
+# Map target to numeric values
+# Map target to numeric values
+data$target <- ifelse(data$target == "Dropout", 1,
+                      ifelse(data$target == "Enrolled", 2,
+                             ifelse(data$target == "Graduate", 3, NA)))
 unique(data$target)
 # The `target` variable is now numeric:
 # For example:
@@ -209,7 +208,7 @@ unique(data$target)
 ################################################################################
 ## Split the dataset
 
-# Now before any analysis or exploraiton is done, the dataset must be split in order
+# Now before any analysis or exploration is done, the dataset must be split in order
 # to avoid overfitting
 # PARTITION DATA
 #set up test and train sets
@@ -246,7 +245,7 @@ ncol(traindata)
 unique(traindata$target)
 table(traindata$target)
 # 3 levels of outcomes to predict, 1137 have dropped out, 636 are currently enrolled, and 1768 have graduated.
-# the relativly small number of currently enrolled students might lead to difficulty. 
+# the relatively small number of currently enrolled students might lead to difficulty. 
 # Look at the top 6 values of each column
 head(traindata)
 #all values are coded with numbers. In order to have a functional and targeted exploration, the following section 
@@ -932,6 +931,14 @@ traindata <- traindata %>% drop_na()
 # Revalidate the datasets to confirm no remaining NAs
 cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), "\n")
 
+# This feature vaalidation section shows that the number of features has been nearly doubled. This could
+# increase predictive power, but could also increase the likelihood of over-fitting. To avoid overfitting
+# steps will be taken in modeling like cross validation and elastic net.
+
+
+
+
+
 #testdata <- testdata %>% drop_na() #### ADD THIS TO TEST SET CLEANING IN FUTURE SECTION IF IT DOESNT RUN WITHOUT IT
 # Revalidate the dataset to confirm no remaining NAs
 #cat("Total NA Count in Test Dataset after removal:", sum(is.na(testdata)), "\n")
@@ -940,16 +947,59 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 ################################################################################
 ## Choosing Classification 
 ################################################################################
+# Now that the dataset has been loaded, cleaned, and split into training and test sets, 
+# followed by exploratory analysis and the development of features to maximize the information within the dataset, 
+# it’s time to start modeling an algorithm to predict college outcomes. 
+# The developed features have been validated and applied consistently to both the training and test sets.
+
+# Since the college outcomes in this dataset are categorized into three distinct groups—dropout, 
+# enrolled, and graduated—a classification approach is the most suitable modeling strategy.
+# Classification enables the algorithm to learn from the dataset and classify each student 
+# into one of these three outcome groups based on the provided features. 
+# This approach aligns well with the structure of the target variable and 
+# ensures predictions are interpretable and actionable.
 
 
+################################################################################
+#PARTITION TRAINING DATA INTO MODEL TRAINING AND VALIDATION SETS
 
+# For reproducibility
+set.seed(456)
+str(train)
+# Partition traindata
+train_model_index <- createDataPartition(traindata$target, p = 0.8, list = FALSE)
 
+training_set <- traindata[train_model_index, ]   # Model training set
+validation_set <- traindata[-train_model_index, ] # Validation set for model evaluation
 
+# Print dimensions to confirm partitioning
+cat("Training Set Dimensions:", dim(training_set), "\n")
+cat("Validation Set Dimensions:", dim(validation_set), "\n")
 
+# Train a Decision Tree model using the training_set dataset
+library(rpart)
 
+# Fit the model
+decision_tree_model <- rpart(
+  target ~ ., 
+  data = training_set, 
+  method = "class"
+)
 
+# Summarize the model
+print(decision_tree_model)
 
+# Predict on the validation set
+validation_predictions <- predict(decision_tree_model, validation_set, type = "class")
 
+# Evaluate the model
+library(caret)
+validation_conf_matrix <- confusionMatrix(validation_predictions, validation_set$target)
+
+# Print the confusion matrix
+print(validation_conf_matrix)
+
+# Results
 
 # Conclusion
 
