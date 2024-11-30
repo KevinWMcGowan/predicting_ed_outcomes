@@ -55,103 +55,64 @@ if (!file.exists(data_path)) {
 data <- read.csv(data_path, header = TRUE, sep = ";")
 variable_table <- read_csv(variable_table_path)
 
-head(data)
-head(variable_table)
-unique(data$Target)
 ################################################################################
 # Clean the datasets
 ################################################################################
 
-# As seen below, the column names include spaces and parenthesis. Both of which
-# will cause issues with analysis later on.
+# As seen below, the column names in data table and the variable and the variable_name column
+  #include spaces and parenthesis. All of which will cause issues with analysis later on.
 cat("Column names in `data` before cleaning:\n")
 colnames(data)
-
+cat("\nColumn names in `variable_table` before cleaning:\n")
+colnames(variable_table)
 cat("\nVariable names in `variable_table` before cleaning:\n")
 print(variable_table$`Variable Name`)
 
+
 # In order to remove these problematic characters, the following regex code removes them.
-clean_column_names <- function(colnames) {
-  colnames %>%
-    # Replace spaces with underscores
-    gsub(" ", "_", .) %>%
-    # Remove parentheses
-    gsub("\\(", "", .) %>%
-    gsub("\\)", "", .) %>%
-    # Replace periods with underscores
-    gsub("\\.", "_", .) %>%
+# Define a function to clean column names by removing problematic characters
+clean_names <- function(names) {
+  names %>%
+    # Convert to lowercase
+    tolower() %>%
+    # Replace spaces and special characters with underscores
+    gsub("[ .\\(\\)/'\\-]", "_", .) %>%
     # Replace multiple underscores with a single one
     gsub("_+", "_", .) %>%
-    # Trim trailing underscores
-    gsub("_$", "", .)
+    # Remove leading and trailing underscores
+    gsub("^_|_$", "", .) %>%
+    # Trim any remaining whitespace
+    trimws()
 }
 
-# Apply cleaning function to `data` columns
-colnames(data) <- clean_column_names(colnames(data))
 
-# Apply cleaning function to `variable_table` columns
-colnames(variable_table) <- clean_column_names(colnames(variable_table))
+# Apply the cleaning function to `data` column names
+colnames(data) <- clean_names(colnames(data))
 
-# Apply cleaning function to the "Variable Name" column in `variable_table`
-variable_table <- variable_table %>%
-  mutate(Variable_Name = clean_column_names(Variable_Name))
+# Apply the cleaning function to `variable_table` column names
+colnames(variable_table) <- clean_names(colnames(variable_table))
 
 # Print cleaned column names
 cat("\nColumn names in `data` after cleaning:\n")
-colnames(data)
+print(colnames(data))
 
-cat("\nVariable names in `variable_table` after cleaning:\n")
-print(variable_table$Variable_Name)
+cat("\nColumn names in `variable_table` after cleaning:\n")
+print(colnames(variable_table))
 
-# Now that the problematic characters have been removed, for simplicity and future referencing,
-# ensure all variable names are the same:
-matching_variables <- intersect(colnames(data), variable_table$Variable_Name)
-non_matching_in_data <- setdiff(colnames(data), variable_table$Variable_Name)
-non_matching_in_variable_table <- setdiff(variable_table$Variable_Name, colnames(data))
+# Now, clean the entries within the 'variable_name' column in `variable_table`
+variable_table$variable_name <- clean_names(variable_table$variable_name)
 
-# Print results
+# Now that the problematic characters have been removed, ensure all variable names are consistent
+matching_variables <- intersect(colnames(data), variable_table$variable_name)
+non_matching_in_data <- setdiff(colnames(data), variable_table$variable_name)
+non_matching_in_variable_table <- setdiff(variable_table$variable_name, colnames(data))
+
+# Display the matching and non-matching variables
 cat("\nMatching Variables:\n")
 print(matching_variables)
 
-cat("\nVariables in `data` but not in `variable_table`:\n")
-print(non_matching_in_data)
+#The above shows that all 37 variable names are now matching.
 
-cat("\nVariables in `variable_table` but not in `data`:\n")
-print(non_matching_in_variable_table)
-
-# Clean any remaining differences in names using an additional cleaning function
-clean_names <- function(names) {
-  names %>%
-    tolower() %>%
-    gsub("['/\\-\\.]", "_", .) %>%  # Replace apostrophes, slashes, and dots with underscores
-    gsub(" +", "_", .) %>%          # Replace spaces with underscores
-    trimws()                        # Remove leading/trailing whitespace
-}
-
-# Apply the `clean_names` function to `data`
-colnames(data) <- clean_names(colnames(data))
-
-# Apply the `clean_names` function to the `Variable Name` column in `variable_table`
-variable_table <- variable_table %>%
-  mutate(Variable_Name = clean_names(Variable_Name))
-
-# Recheck matching variables
-matching_variables <- intersect(colnames(data), variable_table$Variable_Name)
-non_matching_in_data <- setdiff(colnames(data), variable_table$Variable_Name)
-non_matching_in_variable_table <- setdiff(variable_table$Variable_Name, colnames(data))
-
-# Print results after final cleaning
-cat("\nMatching Variables after final cleaning:\n")
-print(matching_variables)
-
-cat("\nVariables in `data` but not in `variable_table` after final cleaning:\n")
-print(non_matching_in_data)
-
-cat("\nVariables in `variable_table` but not in `data` after final cleaning:\n")
-print(non_matching_in_variable_table)
-
-#The above shows that all variable names are now matching.
-#unique(data$target)
 
 ################################################################################
 ## Set Variable Types
@@ -162,42 +123,37 @@ print(non_matching_in_variable_table)
 
 # Extract the actual types from the data
 data_types <- data.frame(
-  Variable_Name = colnames(data),
-  Data_Type = sapply(data, class),
+  variable_name = colnames(data),   
+  data_type = sapply(data, class), 
   stringsAsFactors = FALSE
 )
 
 # Extract expected types from the variable_table
-# Adjust column names as per the actual structure of `variable_table`
 lookup_types <- variable_table %>%
-  select(Variable_Name = `Variable_Name`, Expected_Type = Type)
+  select(variable_name, expected_type = type)
 
 # Join the actual types with the expected types
 comparison <- data_types %>%
-  left_join(lookup_types, by = "Variable_Name")
+  left_join(lookup_types, by = "variable_name") 
 
-# View the comparison
+# Display the comparison
+cat("\nComparison of Actual and Expected Types:\n")
 print(comparison)
 
 # Since R's equivalent of a "continuous" variable type is "numeric", the following changes are made:
 # - `curricular_units_1st_sem_grade` is changed from numeric to integer.
 # - The `target` variable is replaced with numeric values for regression analysis.
-
-# Change `curricular_units_1st_sem_grade` from numeric to integer
-data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_grade)
-
-# Verify the change for `curricular_units_1st_sem_grade`
+data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_grade)`
 str(data[c("curricular_units_1st_sem_grade")])
-# This ensures that the column is now stored as integers, aligning with the expected variable type in the lookup table.
+# Above shows column is now stored as integers, aligning with the expected variable type in the lookup table.
 
-# Replace the `target` variable with its numeric representation
-
+# Since target is the only variable not represented with a number value, 
+  # the following encodes 'target' variable with a numeric representation
 data$target <- ifelse(data$target == "Dropout", 1,
                       ifelse(data$target == "Enrolled", 2,
                              ifelse(data$target == "Graduate", 3, NA)))
-unique(data$target)
+sort(unique(data$target))
 # The `target` variable is now numeric:
-# For example:
 # "Dropout" -> 1
 # "Enrolled" -> 2
 # "Graduate" -> 3
@@ -206,11 +162,8 @@ unique(data$target)
 ################################################################################
 ## Split the dataset
 
-# Now before any analysis or exploration is done, the dataset must be split in order
-# to avoid overfitting
-# PARTITION DATA
-#set up test and train sets
-# for reproducibility
+# Now before any analysis or exploration can be done, as best practice the dataset is split in order
+# to avoid over training.
 set.seed(123)  
 trainindex <- createDataPartition(data$target, p = .8, 
                                   list = FALSE, 
@@ -218,7 +171,10 @@ trainindex <- createDataPartition(data$target, p = .8,
 traindata <- data[trainindex,]
 final_holdout_set  <- data[-trainindex,]
 
-##### count NAs
+
+# For sanity, below the number of nas in both the train and final_holdout set is counted.
+  # This is the only time the final_holdout_set is inspected before testing algorithms.
+
 # Count total NAs in traindata
 total_nas_traindata <- sum(is.na(traindata))
 cat("Total NAs in traindata:", total_nas_traindata, "\n")
@@ -226,34 +182,34 @@ cat("Total NAs in traindata:", total_nas_traindata, "\n")
 # Count total NAs in testdata
 total_nas_final_holdout_set <- sum(is.na(final_holdout_set))
 cat("Total NAs in final_holdout_set data:", total_nas_final_holdout_set, "\n")
+
+
 ################################################################################
-# Exploratory Data Analysis (ENSURE HENCE FORTH NO DATA IS USED!!!!! ONLY TRAIN DATA)
+# Exploratory Data Analysis
 ################################################################################
 # Now that the data has been cleaned, some exploration can be done to better understand
-# the students in the dataset by the variables that describe them. Any findings can contribute
-# to the modeling done later.
+# the students in the traindata by inspecting the variables that describe them. 
+# Any findings can contribute to the modeling done later.
 
-# see number of students in dataset
+# See number of students in dataset
 nrow(traindata)
-#3540 students
-#see the number of variables in the dataset
 ncol(traindata)
-# 36 variables to help predict target (37th)
-# See the unique values of the target variable.
 unique(traindata$target)
 table(traindata$target)
-# 3 levels of outcomes to predict, 1137 have dropped out, 636 are currently enrolled, and 1768 have graduated.
-# the relatively small number of currently enrolled students might lead to difficulty. 
-# Look at the top 6 values of each column
 head(traindata)
-#all values are coded with numbers. In order to have a functional and targeted exploration, the following section 
+
+# The code above shows the data contains 3540 students, 36 variables to help predict target (37th),
+#3 levels of outcomes to predict, 1137 have dropped out, 636 are currently enrolled, and 1768 have graduated.
+# The relatively small number of currently enrolled students will likely lead to difficulty in modeling due to class imbalance
+# Lastly, all values are coded with numbers. In order to have a functional and targeted exploration, the following section 
 # performs a linear regression to get an idea of what variables are predictive of dropout, enrolled, and graduated. Afterwards, these predictive variables
 # will be explored more thoroughly.
 
 
 ################################################################################
-# Perform Linear regression
-
+## Linear Regression 
+## To better understand the predictive variables in the dataset, this regression will visualize
+  # how certain variables might be predictive of target as a whole.
 
 # Extract variable names for the formula
 variables_train <- colnames(traindata)
@@ -266,7 +222,6 @@ formula_string_train <- paste("target ~", paste(variables_train, collapse = " + 
 
 # Convert the string to a formula object
 formula_train <- as.formula(formula_string_train)
-print(formula_train)
 
 # Perform linear regression
 value1 <- lm(formula_train, data = traindata)
@@ -275,32 +230,37 @@ summary(value1)#prolly don't need this summary... chatgpt help me make sense of 
 # Visualize the coefficients
 regression_plot<-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
 regression_plot
-# The coefficient plot above highlights variables that are strongly predictive 
-# of the target outcome, as well as those with wide error margins crossing zero, 
-# indicating they may have little to no effect.
+# The coefficient plot above provides insights into the variables' relationships 
+# with the target outcome and their relative strengths. It highlights variables 
+# with significant predictive power, as well as those with wide error margins 
+# crossing zero, suggesting limited or no effect.
 
-# The plot suggests focusing on variables such as:
+# Key Findings:
+# - **Strong Predictors (Positive Association):**
+
+# Due to the positive coefficients, the plot suggests focusing on variables such as:
 # `tuition_fees_up_to_date`, `international`, 
 # `curricular_units_2nd_sem_approved`, `scholarship_holder`, 
-# `daytime_evening_attendance`, and `curricular_units_1st_sem_enrolled`, 
-# which show positive predictive values ranging from approximately 0.1 to 0.5.
-# These variables may contribute positively to predicting student outcomes like 
-# graduation or enrollment.
+# `daytime_evening_attendance`, and `curricular_units_1st_sem_approved` 
+# These range approximately from 0.1 to 0.5, indicating a positive contribution 
+# toward favorable outcomes like graduation or enrollment.
 
 # Conversely, certain factors show negative correlations with the target, 
 # as indicated by their negative coefficients. These include:
 # `gender`, `curricular_units_1st_sem_credited`, 
 # `curricular_units_2nd_sem_credited`, `educational_special_needs`, 
 # `debtor`, and `curricular_units_2nd_sem_enrolled`.
-# These insights suggest these variables may be associated with less favorable 
-# outcomes, such as dropout.
+# These insights suggest these variables may be associated with lower values of target, 
+# such as dropout and enrolled.
 
 # Together, these findings provide a foundation for deeper exploration into how 
 # these variables influence the target outcomes and how they can be utilized 
 # effectively in predictive modeling.
 
+
 ################################################################################
 # Investigate predictive variables
+################################################################################
 
 # Group variables for analysis
 binary_vars <- c("tuition_fees_up_to_date", "gender", "scholarship_holder", 
@@ -311,27 +271,22 @@ continuous_vars <- c("admission_grade", "curricular_units_1st_sem_grade", "gdp")
 
 ######################################
 # Binary variables
-#view(variable_table)
-# View descriptions for binary variables
+
 
 # Select specific rows and print only the Variable_Name and Description columns
 variable_table %>%
   slice(c(14:19, 21)) %>%  # Select rows 14 to 19 and 21
-  select(Variable_Name, Description) %>%  # Select specific columns
+  select(variable_name, description) %>%  # Select specific columns
   print()
-# 1 = yes & 0 = no for binary values # USE CAT FOR FULL PRINT
+# 1 = yes & 0 = no for binary values
 
-
-# Prepare the data for plotting
+# Plot distribution of binary data
 binary_data <- traindata %>%
   select(all_of(binary_vars)) %>%
   pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value") %>%
   count(Variable, Value)
-
 # Map human-readable names for binary variable values
 value_labels <- c("0" = "No/Not Applicable/Male", "1" = "Yes/Applicable/Female")
-
-# Create the bar chart
 ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
   scale_fill_manual(
@@ -355,41 +310,10 @@ ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
     axis.text.x = element_text(angle = 45, hjust = 1),
     plot.title = element_text(hjust = 0.5)
   )
-
-# The chart above shows that the vast majority of students are not debtor (don't owe money to school), nor special needs, most are male, aren't international, or scholarship holders
-# This finding warrent more digging, since the regression above found all but gender to be predictive of our target variable.
-# Below, compares the same variables against the 3 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
-# Prepare the data for plotting
-binary_target_data <- traindata %>%
-  select(all_of(binary_vars), target) %>%
-  pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
-  count(Variable, Value, target)
-
-# Map human-readable names for binary variable values
-value_labels <- c("0" = "No/Not Applicable/Male", "1" = "Yes/Applicable/Female")
-
-# Create the grouped bar chart
-ggplot(binary_target_data, aes(x = Variable, y = n, fill = as.factor(target))) +
-  geom_bar(stat = "identity", position = position_dodge(), color = "black") +
-  facet_wrap(~Value, labeller = labeller(Value = value_labels)) +
-  labs(
-    title = "Distribution of Binary Variables Across Target Levels",
-    x = "Variables",
-    y = "Count",
-    fill = "Target (1 = Dropout, 2 = Enrolled, 3 = Graduated)"
-  ) +
-  scale_fill_manual(
-    values = c("1" = "steelblue", "2" = "gold", "3" = "darkgreen"),
-    labels = c("1" = "Dropout", "2" = "Enrolled", "3" = "Graduated")
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(hjust = 0.5),
-    strip.text = element_text(size = 10)
-  )
-# summary table of above: 
-# Table of binary variables against target
+# The chart above shows that the vast majority of students are not debtor (don't owe money to school), 
+# nor special needs, most are male, aren't international, or scholarship holders.
+# This finding warrants more digging, since the regression above found all but gender to be predictive of our target variable.
+# Below, the chart compares the same variables against the 3 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
 binary_target_table <- traindata %>%
   select(all_of(binary_vars), target) %>%
   pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
@@ -407,8 +331,14 @@ print(binary_target_table)
 
 # A few powerful takeaways include: 
 #- A significant number of students who dropped out (312) were debtors compared to those who graduated (101) or are still enrolled (90).
-#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374). However, The rate of scholarship holders dropping out (12%)
-  # is much loter tahn that of nonscholarship holdrs 38%. Suggesting financial support is an incentive to not dropout
+#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374). 
+
+#Below, one can see the rate of scholarship holders dropping out (12%)
+  # is much lower than that of non_scholarship holders (38%). 
+
+
+### Scholarship Comparison to Dropout
+# Compare scholarship holder drop out vs non_scholarship holder dropout
 scholarship_holder_rate <- binary_target_table %>%
   filter(Variable == "scholarship_holder", Value == 1) %>%
   summarize(
@@ -417,7 +347,7 @@ scholarship_holder_rate <- binary_target_table %>%
     scholarship_dropout_rate = total_scholarship_dropouts / total_scholarship_students
   )
 scholarship_holder_rate
-# same a above for non_scholarship holders
+# same as above for non_scholarship holders
 non_scholarship_holder_rate <- binary_target_table %>%
   filter(Variable == "scholarship_holder", Value == 0) %>%
   summarize(
@@ -426,10 +356,14 @@ non_scholarship_holder_rate <- binary_target_table %>%
     non_scholarship_dropout_rate = total_non_scholarship_dropouts / total_non_scholarship_students
   )
 non_scholarship_holder_rate
-#- Although there are significantly more men (2278) than women (1262), in the dataset, they have roughly the same number of drop outs (men = 556 & women = 569).
+# This finding suggests financial support is a strong incentive to not dropout.
+
+
+### Gender Comparison to Dropout
+  #Although there are significantly more men (2278) than women (1262), in the dataset, they have roughly the same number of drop outs (men = 556 & women = 569).
   # As a result, the rate of female_drop out is very high 45% for women vs 24% for men.
   # This could be sampling error and possibly unique to the dataset which is taken from the following diverse degree programs:
-  #"agronomy, design, education, nursing, journalism, management, social service, and technologies" (cite).
+  #"agronomy, design, education, nursing, journalism, management, social service, and technologies" (Martins et al., 2021).
 gender_male_rate <- binary_target_table %>%
   filter(Variable == "gender", Value == 0) %>%
   summarize(
@@ -459,6 +393,7 @@ owe_fees_drop_rate <- binary_target_table %>%
   )
 owe_fees_drop_rate
 
+### International Students & Dropout
 # International students have a drop out rate of 30%, which is similar to the total dropout rate of teh data set ~32%.
 # this is interesting when internation status was the second most predictive variable after tuition and fees up to date.
 international_rate <- binary_target_table %>%
@@ -478,7 +413,8 @@ overall_dropout_rate <- traindata %>%
   )
 overall_dropout_rate
 
-# Althought there were not many students with special needs in the dataset, the 
+### Students with Special Needs & Dropout
+# Although there were not many students with special needs in the dataset, the 
 # the perseverence of these students, and possibly their support is clear when the dropout rate of 35% is not much
 # high than that of the dataset as a whole (~32%)
 educational_special_needs_rate <- binary_target_table %>%
@@ -492,14 +428,14 @@ educational_special_needs_rate
 
 
 ###############################################################################
-#Continuous Variables, specifically, the cirriculular unit variables
+## Exploring Continuous Variables
 
 semester_variables <- variable_table %>%
   slice(22:33) %>%
   mutate(
-    Semester = if_else(str_detect(Variable_Name, "1st_sem"), "1st Semester", "2nd Semester")
+    Semester = if_else(str_detect(variable_name, "1st_sem"), "1st Semester", "2nd Semester")
   )
-print(semester_variables %>% select(Variable_Name, Semester))
+print(semester_variables %>% select(variable_name, Semester))
 # As seen above the curricular unit variables give us 6 looks at how the students stand each semester.
 # - The number of credits earned
 # - The number of units enrolled in
@@ -511,16 +447,16 @@ print(semester_variables %>% select(Variable_Name, Semester))
 # Identify trends
 # Group the continuous variables by semester and summarize their statistics
 semester_summary <- traindata %>%
-  select(all_of(semester_variables$Variable_Name)) %>%
-  pivot_longer(everything(), names_to = "Variable_Name", values_to = "Value") %>%
-  left_join(semester_variables, by = "Variable_Name") %>%
-  group_by(Semester, Variable_Name) %>%
+  select(all_of(semester_variables$variable_name)) %>%
+  pivot_longer(everything(), names_to = "variable_name", values_to = "value") %>%
+  left_join(semester_variables, by = "variable_name") %>%
+  group_by(Semester, variable_name) %>%
   summarize(
-    Mean = mean(Value, na.rm = TRUE),
-    Median = median(Value, na.rm = TRUE),
-    SD = sd(Value, na.rm = TRUE),
-    Min = min(Value, na.rm = TRUE),
-    Max = max(Value, na.rm = TRUE),
+    Mean = mean(value, na.rm = TRUE),
+    Median = median(value, na.rm = TRUE),
+    SD = sd(value, na.rm = TRUE),
+    Min = min(value, na.rm = TRUE),
+    Max = max(value, na.rm = TRUE),
     .groups = "drop"
   )
 print(semester_summary)
@@ -532,13 +468,13 @@ print(semester_summary)
 
 # The following code visualizes the distribution of each of these variables.
 # Boxplot of variables grouped by semester
-traindata %>%
-  select(all_of(semester_variables$Variable_Name)) %>%
-  pivot_longer(everything(), names_to = "Variable_Name", values_to = "Value") %>%
-  left_join(semester_variables, by = "Variable_Name") %>%
-  ggplot(aes(x = Variable_Name, y = Value, fill = Semester)) +
+units_distributed<- traindata %>%
+  select(all_of(semester_variables$variable_name)) %>%
+  pivot_longer(everything(), names_to = "variable_name", values_to = "value") %>%
+  left_join(semester_variables, by = c("variable_name" = "variable_name")) %>%
+  ggplot(aes(x = variable_name, y = value, fill = Semester)) + # Match exact case of "Semester"
   geom_boxplot() +
-  facet_wrap(~ Semester, scales = "free") +
+  facet_wrap(~ Semester, scales = "free") + # Ensure "Semester" column exists and matches case
   labs(
     title = "Distribution of Continuous Variables by Semester",
     x = "Variables",
@@ -546,8 +482,10 @@ traindata %>%
     fill = "Semester"
   ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
-#most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
+units_distributed
+# most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
 # who are no longer earning credits, but also telling of students who might have dropped out, more than students enrolled (which is the smallest group)
+# without more context into what units credited means, it's hard to draw conclusions.
 
 # Again, average grades are only just above 10/20 in semester 1, with some more variablility in semester 2, but a similar average.
 
@@ -588,10 +526,6 @@ dropout_with_diff_summary <- dropout_summary %>%
 # Print the final table
 print(dropout_with_diff_summary)
 
-#COMPLETE DESCRIPTION/SUMAMRY OF FINDINGS ABOVE AND HOW THEY SUGGEST FEATURE DEVELOPMENT
-# The table above shows clearly the difference in 
-
-
 
 ################################################################################
 # Categorical variables, specifically nationality[8], Previous education, previous education grade, degree programs, and courses
@@ -610,9 +544,9 @@ print(nationality_summary)
 # Pull description for nationality (row 8) in the variable table
 variable_description <- variable_table %>%
   slice(8) %>% 
-  select(Variable_Name, Description) %>%
-  mutate(Description = str_wrap(Description, width = 80)) 
-description_text <- variable_description$Description
+  select(variable_name, description) %>%
+  mutate(description = str_wrap(description, width = 80)) 
+description_text <- variable_description$description
 cat(description_text)
 # Above shows over 97% of the dataset is Portuguese. An appropriate finding for a Portugal based university.
 
@@ -631,9 +565,9 @@ print(previous_education_summary)
 # Pull description for nationality (row 6) in the variable table
 variable_description <- variable_table %>%
   slice(6) %>% 
-  select(Variable_Name, Description) %>%
-  mutate(Description = str_wrap(Description, width = 80)) 
-description_text <- variable_description$Description
+  select(variable_name, description) %>%
+  mutate(description = str_wrap(description, width = 80)) 
+description_text <- variable_description$description
 cat(description_text)
 # Result above show that 84% of students in the sample have recently come from secondary education (1) AKA High Schools. 
 # suggesting the sample describes largely Freshman and Sophomore students who had not had other more recent achievements, like the 5% with Technological specialization course (39).
@@ -664,9 +598,9 @@ print(grade_summary)
 # Pull description for previous education grade (row 7) in the variable table
 variable_description <- variable_table %>%
   slice(7) %>% 
-  select(Variable_Name, Description) %>%
-  mutate(Description = str_wrap(Description, width = 80)) 
-description_text <- variable_description$Description
+  select(variable_name, description) %>%
+  mutate(description = str_wrap(description, width = 80)) 
+description_text <- variable_description$description
 cat(description_text)
 # The average grade coming into university was about 133/200, with a standard deviation of 13.
 
@@ -689,15 +623,28 @@ print(total_students)
 # Pull description for course (row 4) in the variable table
 variable_description <- variable_table %>%
   slice(4) %>% 
-  select(Variable_Name, Description) %>%
-  mutate(Description = str_wrap(Description, width = 80)) # Adjust width as needed
+  select(variable_name, description) %>%
+  mutate(description = str_wrap(description, width = 80)) # Adjust width as needed
 # Convert to data frame and print the description using cat
-description_text <- variable_description$Description
+description_text <- variable_description$description
 cat(description_text)
 # Above shows that out of 17 courses and 3540 students, the majority (17%) are in the nursing program
 # 8.5% in Management, 8% in social services, and ~8%  in both veterinary nursing and Journalism and communication.
 # The rst of the course have 6% - .2% each. These results suggest a good distribution across fields of study.
 
+
+
+# Exploratory Data Analysis Summary:
+
+# - Examined binary variables (e.g., debtor status, scholarship holder, gender) and their distributions.
+# - Identified that scholarship holders have a significantly lower dropout rate (12%) compared to non-scholarship holders (38%).
+# - Noted that international students have a dropout rate similar to the overall rate (~30%), despite being a predictive variable.
+# - Analyzed semester-wise academic performance, observing that dropouts have lower average grades compared to graduates.
+# - Visualized data using bar charts and boxplots to highlight key differences across groups.
+
+# Based on the insights from the exploratory analysis, the next section engineers new features.
+# These features will capture important factors such as financial status, academic performance, and course difficulty,
+# enhancing the predictive power of the models to be built.
 ################################################################################
 ## Feature Development
 ################################################################################
@@ -1116,6 +1063,13 @@ print(gbt_holdout_conf_matrix)
 
   #Additional strategies (e.g., SMOTE or weighted loss functions) could further improve performance on the minority class.
   #Neither model explicitly used techniques like oversampling, undersampling, or class-weighted learning to fully address class imbalance.
+
+units_distributed
+# most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
+# who are no longer earning credits, but also telling of students who might have dropped out, more than students enrolled (which is the smallest group)
+# without more context into what units credited means, it's hard to draw conclusions.
+
+
 regression_plot
 
 
