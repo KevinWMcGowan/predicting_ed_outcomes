@@ -86,16 +86,13 @@ clean_names <- function(names) {
 }
 
 
-# Apply the cleaning function to `data` column names
+# Apply the cleaning function to `data` and `variable_table` names
 colnames(data) <- clean_names(colnames(data))
-
-# Apply the cleaning function to `variable_table` column names
 colnames(variable_table) <- clean_names(colnames(variable_table))
 
 # Print cleaned column names
 cat("\nColumn names in `data` after cleaning:\n")
 print(colnames(data))
-
 cat("\nColumn names in `variable_table` after cleaning:\n")
 print(colnames(variable_table))
 
@@ -140,11 +137,11 @@ comparison <- data_types %>%
 cat("\nComparison of Actual and Expected Types:\n")
 print(comparison)
 
-# Since R's equivalent of a "continuous" variable type is "numeric", the following changes are made:
+# Since R's equivalent of a "continuous" variable type is "numeric", the following changes are made:(or only 1 chang is needded (target as factor)
 # - `curricular_units_1st_sem_grade` is changed from numeric to integer.
 # - The `target` variable is replaced with numeric values for regression analysis.
-data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_grade)`
-str(data[c("curricular_units_1st_sem_grade")])
+#data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_grade)`
+#str(data[c("curricular_units_1st_sem_grade")])
 # Above shows column is now stored as integers, aligning with the expected variable type in the lookup table.
 
 # Since target is the only variable not represented with a number value, 
@@ -153,7 +150,7 @@ data$target <- ifelse(data$target == "Dropout", 1,
                       ifelse(data$target == "Enrolled", 2,
                              ifelse(data$target == "Graduate", 3, NA)))
 sort(unique(data$target))
-# The `target` variable is now numeric:
+# The target variable is now numeric:
 # "Dropout" -> 1
 # "Enrolled" -> 2
 # "Graduate" -> 3
@@ -633,8 +630,8 @@ cat(description_text)
 # The rst of the course have 6% - .2% each. These results suggest a good distribution across fields of study.
 
 
-
-# Exploratory Data Analysis Summary:
+################################################################################
+### Exploratory Data Analysis Summary:
 
 # - Examined binary variables (e.g., debtor status, scholarship holder, gender) and their distributions.
 # - Identified that scholarship holders have a significantly lower dropout rate (12%) compared to non-scholarship holders (38%).
@@ -645,21 +642,17 @@ cat(description_text)
 # Based on the insights from the exploratory analysis, the next section engineers new features.
 # These features will capture important factors such as financial status, academic performance, and course difficulty,
 # enhancing the predictive power of the models to be built.
+
+
 ################################################################################
 ## Feature Development
 ################################################################################
 
-#- create a owe money feature of students who both are debtor = 1 and tuition feeds up to date = 0 
-# create students who failed first semester with 1st Semester curricular_units_1st_sem_grade  =>10 (50% of 20) 
-# students who failed both first and second semester 2nd Semester curricular_units_2nd_sem_grade  =>10 & 1st Semester curricular_units_1st_sem_grade  =>10
-# under enrolled
-# create course ID to semester grade, and semester units credited to get idea of harder courses. maybe even discouraging courses when taken first semester and then lead to student enrollment of 0 the next semester.
-# taking a break students who 2nd semester unit enrollment enroll = 0
-#hard courses could also be a feature where user had high number of unit 1st semeseter evalautions
-# graduates could be earning 0 credits  in first or second semester because they are graduated. Maybe this could be a feature 
+# Feature development is the practice of getting the most out of a dataset by introducing new
+# variables. The feature engineering function below creates 26 new features in 10 categories. 
+# The description of each category of features is found at the end of each chunk of code.
 
-# Define a feature engineering function:
-combined_feature_engineering <- function(data) {
+feature_engineering <- function(data) {
   
   # 1. Grading Scale Mapping (Numeric Categories)
   map_grades_to_category <- function(grade) {
@@ -677,7 +670,7 @@ combined_feature_engineering <- function(data) {
     mutate(
       grade_category_1st_sem = map_grades_to_category(curricular_units_1st_sem_grade),
       grade_category_2nd_sem = map_grades_to_category(curricular_units_2nd_sem_grade)
-    ) # The grade_categories features use the Portuguese grading standards to define clear pass and fail, along with exemplary performance.
+    ) # The grade_categories features use the Portuguese grading standards to define 6 ordinal academic performance categories.
   
   # 2. Owe Money Feature
   data <- data %>%
@@ -716,7 +709,7 @@ combined_feature_engineering <- function(data) {
     mutate(
       overall_avg_grade = (avg_grade_1st_sem + avg_grade_2nd_sem) / 2,
       overall_std_grade = (std_grade_1st_sem + std_grade_2nd_sem) / 2
-    ) # The course difficulty feature quantifies how challenging a course is based on student grades. 
+    ) # The course difficulty feature quantifies how challenging a course is based on all student grades in the sample. 
   
   # 6. Hard Courses
   data <- data %>%
@@ -741,7 +734,7 @@ combined_feature_engineering <- function(data) {
       normalized_previous_grade = previous_qualification_grade / 200,
       strong_historical_success = ifelse(normalized_previous_grade >= 0.663, 1, 0),
       weak_historical_success = ifelse(normalized_previous_grade < 0.5966, 1, 0)
-    ) # Uses normalized thresholds to categorize students with strong or weak prior success.
+    ) # Uses normalized thresholds to categorize students with strong or weak prior success before coming to university.
   
   # 9. Grade-Based Summaries
   data <- data %>%
@@ -766,21 +759,39 @@ combined_feature_engineering <- function(data) {
 }
 
 
-### Separately apply the combined function to the training data and test data
+### Separately apply the combined function to the training data and the final_holdout_Set
+
 # Apply to training data
-traindata <- combined_feature_engineering(traindata)
+traindata <- feature_engineering(traindata)
 
 # Apply to final_holdout_set
-final_holdout_set <- combined_feature_engineering(final_holdout_set)
+final_holdout_set <- feature_engineering(final_holdout_set)
+  # Note, although the feature engineering come back to oORDER ON THIS ONE HEREEEEEEE
+
+
+
+
+
 
 
 ################################################################################
 ## Validate Feature Development on Training Data 
 ################################################################################
+# This section validates that the feature engineering function above was effective and
+# and didn't introduce NA's into the dataset. 
+
+# The following code prints the new size of the datasets:
 ncol(traindata)
 colnames(traindata)
 
-validate_combined_features <- function(data) {
+
+# The following function does 4 key things to evaluate the newly engineered features:
+#- 1. Count total NAs in the dataset
+#- 2. Count total NAs in each feature
+#- 3. Count if any features are 100% 0 or 1 to indicate a lack of predictive power
+#- 4. Plots 8 of a few of the 26 new features
+
+validate_features <- function(data) {
   # 1. Count Total NAs in the Dataset
   total_na <- sum(is.na(data))
   cat("Total NA Count in Dataset:", total_na, "\n")
@@ -809,10 +820,10 @@ validate_combined_features <- function(data) {
   
   # 4. Visualize Key Features
   key_features <- c(
-    "grade_category_1st_sem", "grade_category_2nd_sem", "owe_money", 
-    "failing_first_sem", "failing_both_semesters", "under_enrolled_1st_sem", 
-    "under_enrolled_2nd_sem", "under_enrolled_both_sem", "hard_courses", 
-    "discouraging_courses", "strong_historical_success", "weak_historical_success", 
+    "owe_money", 
+    "failing_first_sem", 
+    "under_enrolled_2nd_sem", "under_enrolled_both_sem", 
+    "discouraging_courses", "weak_historical_success", 
     "average_grade", "semester_grade_gap"
   )
   
@@ -840,7 +851,7 @@ validate_combined_features <- function(data) {
   ))
 }
 # Apply the updated validation function
-validation_train_results <- validate_combined_features(traindata)
+validation_train_results <- validate_features(traindata)
 
 # Total NAs in the dataset
 cat("Total NA Count:", validation_train_results$total_na, "\n")
@@ -862,26 +873,34 @@ if (nrow(validation_train_results$constant_features) > 0) {
 for (feature_name in names(validation_train_results$feature_plots)) {
   print(validation_train_results$feature_plots[[feature_name]])
 }
+# Distribution of Semester gap: shows most students have no little difference in grades with a normal distribution around 0
+  # with some outliars at -10 and + 10, which may point to dropouts or students who return from a break.
+# Distribution of Average grade: shows largest cluster between 10/20 and 15/20, with a very large concentration at 0, and a smaller concentration between 5 and 10
+  # suggesting some students are in trouble of failing or simply not taking courses.
+# Distribution of weak historical success shows majority of students performed well in past, but about 500 did not
+# Discouraging courses show about 100 students have taken classes that led to them receiving a failing grade (below 10).
+# Strangely, most students fall into the category of being under enrolled in both semesters (less than 10 credits). 
+  # This may be due to missing domain knowledge on part of the author.
+# Distribution of failing first semester shows about 500 students are getting grades below 10/20.
+# Owe money distribution is not capturing many students, but since tuition fees up to date was most predictive of target
+# in the regression before, it will be retained.
 
-
-# remove the 2 NAs:
-# Remove rows with NA values from the training and test datasets
+# With the feature development successful at generating new features, a final step includes
+# removing the 2 NAS that were generated"
 traindata <- traindata %>% drop_na()
-# Revalidate the datasets to confirm no remaining NAs
+# Validate the dataset no longer contain NAs
 cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), "\n")
 
 # This feature validation section shows that the number of features has been nearly doubled. This could
-# increase predictive power, but could also increase the likelihood of over-fitting. To avoid overfitting
-# steps will be taken in modeling like cross validation and elastic net.
-
-
-
-
+# increase predictive power, but could also increase the likelihood of over-fitting. To avoid over fitting
+# steps will be taken in modeling, like cross validation.
 
 
 ################################################################################
 ## Choosing Classification 
 ################################################################################
+# This section justifies classification as the task for predicting student outcoems.
+
 # Now that the dataset has been loaded, cleaned, and split into training and test sets, 
 # followed by exploratory analysis and the development of features to maximize the information within the dataset, 
 # it’s time to start modeling an algorithm to predict college outcomes. 
@@ -894,24 +913,27 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 # This approach aligns well with the structure of the target variable and 
 # ensures predictions are interpretable and actionable.
 
-## Splitting 'traindata' for Model Training and Evaluation
-# Step 1. Partition traindata
+################################################################################
+### Splitting 'traindata' for Model Training and Evaluation
+
+# Partition traindata
 set.seed(456)
 train_model_index <- createDataPartition(traindata$target, p = 0.8, list = FALSE)
 training_set <- traindata[train_model_index, ]   # Model training set
-validation_set <- traindata[-train_model_index, ] # Validation set for model evaluation
+validation_set <- traindata[-train_model_index, ] # Validation set for model eval
 
 
-# Step 2. Convert `target` to a factor in the training and evaluation sets
+# Convert target to a factor in the training and evaluation sets
 training_set$target <- as.factor(training_set$target)
 validation_set$target <- as.factor(validation_set$target)
 
-################################################################################
-# Model #1 Decision Tree Classification
-################################################################################
 
-## Train the Decision Tree model
-# Step 3. Train Decision Tree Model
+################################################################################
+## Model #1 Decision Tree Classification
+################################################################################
+### Train the Decision Tree Model
+
+# Training
 decision_tree_model <- rpart(
   target ~ ., 
   data = training_set, 
@@ -950,13 +972,16 @@ table(training_set$target)
 
 
 ################################################################################
-# Model #2: Gradient Boosted Trees with Cross-Validation
+## Model #2: Gradient Boosted Trees with Cross-Validation
 ################################################################################
+# In order to account for the class imbalance, boosted trees increase the number of 
+# iterations and samplings for enrolled AKA Target =2. Additionally, to account for the many features,
+# this model uses cross validation as the method.
 
 ## Define training control for cross-validation
 train_control_gbt <- trainControl(
-  method = "cv",          # Use k-fold cross-validation
-  number = 5,             # Number of folds
+  method = "cv",          # k-fold cross-validation
+  number = 5,             # folds
   verboseIter = TRUE
 )
 
@@ -968,7 +993,7 @@ gbt_grid <- expand.grid(
   n.minobsinnode = c(5, 10)           # Minimum number of observations in a node
 )
 
-## Train the Gradient Boosted Trees model
+## Train the Gradient Boosted Trees model (This will take a few minutes)
 set.seed(123)
 gbt_model <- train(
   target ~ ., 
@@ -978,6 +1003,14 @@ gbt_model <- train(
   tuneGrid = gbt_grid,
   verbose = FALSE
 )
+# Thanks to cross validations 5 folds, the model is trained on 4 folds and validated on the 5th.
+# This ensures that all data is used for both training and validation.
+# Boosting reweights categories that are misclassified within the folds to handle class imbalance (e.g., Target = 2)
+
+# Print the best model parameters from cross-validation
+cat("Best Model Parameters from Cross-Validation:\n")
+print(gbt_model$bestTune)
+
 
 ## Predict on the validation set
 gbt_predictions <- predict(gbt_model, validation_set)
@@ -988,21 +1021,27 @@ print(gbt_conf_matrix)
 
 # Optional: Visualize the performance of the Gradient Boosted Trees model
 plot(gbt_model)
+  # The plot shows that boosting iteraction (x-axis) did greatly impact accuracy (as seen on y axis)
+  # fora ll three outcomes (dropout=1, enrolled =2, graduated =3).
+  # Cross validation automatically picked the best tune that optimizes for the best outcoems across all 2.
+  # The chart shows that the three values align best around 200 trees, a depth of 3, shrinkage of .05
+  # and 10 obsevations per node.
 
 ################################################################################
 # GBT Model Performance
 print(gbt_conf_matrix)
 # While the GBT model shows improved performance in predicting the “enrolled” class (Class 2) compared to the Decision Tree, it still struggled, as evidenced by its sensitivity for Class 2 being only 38.4%.
-# This suggests that the GBT model indirectly handles some aspects of class imbalance through its iterative learning process, although not directly.
+# This suggests that the GBT model use of additional trees handles some aspects of class imbalance through its iterative learning process, although not with 100% success.
 
 #The GBT model maintained strong sensitivity for Class 1 (dropout) at 75.98% and improved precision for this class (Positive Predictive Value: 84.88%) compared to the Decision Tree. As a result, the GBT model achieves a good balance of sensitivity and precision for the critical drop out class.
 # GBT implementation already demonstrates reasonable performance for sensitivity.
 
-# For  Class 2 (Enrolled), the GPT modele achieving a sensitivity of 38.40%. While this is still relatively low, it is a significant improvement over the Decision Tree model, which failed to predict any enrolled students. The specificity was 92.44%, and the positive predictive value was 52.17%.
+# For  Class 2 (Enrolled), the GPT model achieving a sensitivity of 38.40%. While this is still relatively low, it is a significant improvement over the Decision Tree model, which failed to predict any enrolled students. The specificity was 92.44%, and the positive predictive value was 52.17%.
 
 # For Class 3 (Graduate), the sensitivity was 92.07%, with a specificity of 75.99% and a positive predictive value of 79.27%. These results are comparable to those of the Decision Tree model, with a slight decrease in sensitivity but improved specificity and precision.
 
-# Overall, the GBT model outperformed the Decision Tree model, particularly in its ability to predict the enrolled class. The improved sensitivity and positive predictive value for enrolled students suggest that the GBT model is better at capturing the nuances in the data that distinguish this class. This enhancement may be attributed to the GBT model’s ability to model complex interactions and its robustness against overfitting due to cross-validation.
+# Overall, the GBT model outperformed the Decision Tree model, particularly in its ability to predict the enrolled class. The improved sensitivity and positive predictive value for enrolled students suggest that the GBT model is better at capturing the nuances in the data that distinguish this class. 
+# This enhancement may be attributed to the GBT model’s ability to model complex interactions and its robustness against overfitting due to cross-validation.
 
 
 ################################################################################
@@ -1015,13 +1054,12 @@ print(gbt_conf_matrix)
 # it's now time to test each model on the final_holdout_set
 
 # Step 1: Feature Engineering
-#apply feature enginnering function to final_holdout_set
-combined_feature_engineering(final_holdout_set)
-# Apply the updated validation function
-validation_holdout_results <- validate_combined_features(final_holdout_set)
-cat("Total NA Count:", validation_holdout_results$total_na, "\n")
+#apply feature engineering function to final_holdout_set
+feature_engineering(final_holdout_set)
+# Apply the feature engineering validation function
+validation_holdout_results <- validate_features(final_holdout_set)
 
-# no features appear to have no predictive value by being entirely 0 or 1
+# There are 8 NAs. A negligable amount. So they are dropped
 cat("Total NA Count in final_holdout_set  before removal:", sum(is.na(final_holdout_set)), "\n")
 final_holdout_set <- final_holdout_set %>% drop_na()
 cat("Total NA Count in final_holdout_set after removal:", sum(is.na(final_holdout_set)), "\n")
@@ -1042,35 +1080,94 @@ gbt_holdout_predictions <- predict(gbt_model, final_holdout_set)
 gbt_holdout_conf_matrix <- confusionMatrix(gbt_holdout_predictions, final_holdout_set$target)
 cat("Gradient Boosted Trees Results on Final Holdout Set:\n")
 print(gbt_holdout_conf_matrix)
+# The results above show, in terms of balanced accuracy, the boosted tree model was able to maintain similar performance to the DT model
+# in predicting dropout (GBT = .81 vs DT = .81) and enrolled (GBT = .85 vs DT = .80)  while making up 15% in enrolled (GBT = .65 vs DT = .50).
+# This difference is certainly attributed to cross validations and the boosted resampling. 
 
+
+## Step 5: Visualize GBT & Decision Tree Performance on Final Holdout
+
+# Function to plot confusion matrix heatmap
+plot_confusion_matrix <- function(conf_matrix, model_name) {
+  conf_matrix_df <- as.data.frame(conf_matrix$table)
+  ggplot(conf_matrix_df, aes(x = Reference, y = Prediction, fill = Freq)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = Freq), color = "white", fontface = "bold") +
+    scale_fill_gradient(low = "lightblue", high = "darkblue") +
+    labs(
+      title = paste("Confusion Matrix Heatmap for", model_name, "Model"),
+      x = "Actual Class",
+      y = "Predicted Class"
+    ) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
+    )
+}
+
+# Visualize Decision Tree Model
+dt_conf_matrix_plot <- plot_confusion_matrix(dt_holdout_conf_matrix, "Decision Tree")
+print(dt_conf_matrix_plot)
+# Represented by the darker colors in the top right and bottom left, the model greatly favored enrollment and dropout, and completely missed enrolled.
+  # This performance was expected and negligably different from the DT performance on the validation set:
+    #- validation set results =  balanced accuracy of  0.8423   0.5000   0.8008 in Dropout, enrolled, and graduate, respectively.
+    # Final_holdout_set results = 0.8133    0.500   0.8011 
+
+# Visualize Gradient Boosted Trees Model
+gbt_conf_matrix_plot <- plot_confusion_matrix(gbt_holdout_conf_matrix, "GBT")
+print(gbt_conf_matrix_plot)
+# The GBT heat map shows slightly lower correct predictions for enrolled and dropout compared to DT, 
+  # but actually made predictions for enrolled, making it the stronger of the two models.
 
 
 ################################################################################
 # Conclusion
 ################################################################################
-
+# In conclusion, the performance of these two models are mediocre at best. Due to class imbalance, precision/pos predictive value is one of the best measures of success. 
+# As shown above, GBT performs much better than decision trees in this regaard (DT = 0.7267      NaN   0.7329) vs (GPT = 0.7695  0.50000   0.8148).
+# This difference is largely due to cross validation and the use of boosted sampling for mis-classified target in it's training. 
+# However, with GBT only identified 38% of enrolled students (sensitivity), as a result, the model is left wanting. 
+# On the positive side, enrolled is the least important group for prediction since it is the most easily identified in the present. Notably, 
+# accurately predicting 74% of dropouts and 90% (sensitivity) of graduates are strong outcomes and suggests that with further refinement
+# as discussed in the following section greater outcomes can be achieved.
 
 ## Limitations
  # This data doesn't include year over year data resulting in limited conclusion ability based
   # on annual distribution of enrolled, graduate, and drop out.
-  # don't know the university? maybe we do? If we don't then we don't know what fianncial support looks like (maybe future direction)
+  # don't know the university? maybe we do? If we don't then we don't know what financial support looks like (maybe future direction)
   # Don't know for certain without further digging which courses belong to which degree program. Making this connection would contribute to knowing the unique suport needs of each degree path.
+  # There are too many features and not enough data. 
+ncol(traindata)
+nrow(traindata)
+table(traindata$target)
+# With 62 features interacting to predict educational outcomes on a training dataset with 3539 students, 
+# only 647 currently enrolled, vs 1124 dropout and 1768 graduate both models were over-fitting due to this low prevelance.
+
+# 7. Uncertainty in "Units Credited":
+# Most students on average were earning 0 credits, which may reflect graduates who are no longer earning credits or students who have dropped out. 
+# This pattern may not accurately represent currently enrolled students, who are the smallest group. Without more context about what "units credited" means, 
+# it is difficult to draw clear conclusions.
 
 ## Future Directions
-  # There were many variables that were not further explored because their predictability in their current form wasn't strong enough to warent immediate feature development.
-  # For instance, all the variables that feel along 0 in the plot below were largely left alone, leading to opportunity to develop new feature not yet explored.
-  # Specially, creating demographic features that describe parent occupation and previsou education acheivement (qualification) could increase or decrease liklihood of success in UNiversity.
+  # There were many variables that were not further explored because their predictability in their current form wasn't strong enough to warrant immediate exploration and feature development.
+  # For instance, all the variables that fell along 0 in the regression plot below were largely left alone, leading to opportunity to develop new feature not yet explored.
+  # Specially, creating demographic features that describe parent occupation and previous education achievement (qualification) could increase or decrease likelihood of success in University.
 
-  #Additional strategies (e.g., SMOTE or weighted loss functions) could further improve performance on the minority class.
-  #Neither model explicitly used techniques like oversampling, undersampling, or class-weighted learning to fully address class imbalance.
+  # In order to address class imbalance, additional strategies can be employed like SMOTE or weighted loss functions) could further improve performance on the minority class.
+  # Neither model explicitly used techniques like oversampling, undersampling, or class-weighted learning to fully address class imbalance (is this statement true of the gradient boosted method employed above?)
+  # Additionally, research should test an elastic net model or lasso to more strategically select which features to include. Another future direction is 
+  # to add 
 
-units_distributed
-# most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
-# who are no longer earning credits, but also telling of students who might have dropped out, more than students enrolled (which is the smallest group)
-# without more context into what units credited means, it's hard to draw conclusions.
+  # it would be interesting to change this to a 2 classification problem only seeking the end of college outcome of 
+  # of graduate or dropout. 
+
+  # Lastly, a probabilistic approach like multinomial linear regression would be a logical next step to inform
+  # counselors and stakeholders of the probability each student has of falling into the dropout category.
+  # This would give counselors information they could act on.
 
 
-regression_plot
+
 
 
 
