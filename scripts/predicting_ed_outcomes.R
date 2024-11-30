@@ -25,7 +25,7 @@
 ################################################################################
 
 # List of required packages
-packages <- c("readr", "gbm" "tinytex", "dplyr", "caret", "rpart", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
+packages <- c("readr", "gbm", "tinytex", "dplyr", "caret", "rpart", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
 
 # Check and install missing packages
 for (pkg in packages) {
@@ -216,7 +216,7 @@ trainindex <- createDataPartition(data$target, p = .8,
                                   list = FALSE, 
                                   times = 1)
 traindata <- data[trainindex,]
-testdata  <- data[-trainindex,]
+final_holdout_set  <- data[-trainindex,]
 
 ##### count NAs
 # Count total NAs in traindata
@@ -224,8 +224,8 @@ total_nas_traindata <- sum(is.na(traindata))
 cat("Total NAs in traindata:", total_nas_traindata, "\n")
 
 # Count total NAs in testdata
-total_nas_testdata <- sum(is.na(testdata))
-cat("Total NAs in testdata:", total_nas_testdata, "\n")
+total_nas_final_holdout_set <- sum(is.na(final_holdout_set))
+cat("Total NAs in final_holdout_set data:", total_nas_final_holdout_set, "\n")
 ################################################################################
 # Exploratory Data Analysis (ENSURE HENCE FORTH NO DATA IS USED!!!!! ONLY TRAIN DATA)
 ################################################################################
@@ -757,40 +757,36 @@ combined_feature_engineering <- function(data) {
   # half that amount (10 credits in the 1st semester and 2nd semester).
   
   # 5. Course Difficulty
-  course_difficulty <- data %>%
+  data <- data %>%
     group_by(course) %>%
-    summarize(
+    mutate(
       avg_grade_1st_sem = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
       std_grade_1st_sem = sd(curricular_units_1st_sem_grade, na.rm = TRUE),
       avg_grade_2nd_sem = mean(curricular_units_2nd_sem_grade, na.rm = TRUE),
-      std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE),
-      .groups = "drop"
+      std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE)
     ) %>%
+    ungroup() %>%
     mutate(
       overall_avg_grade = (avg_grade_1st_sem + avg_grade_2nd_sem) / 2,
       overall_std_grade = (std_grade_1st_sem + std_grade_2nd_sem) / 2
-    )
-  data <- data %>%
-    left_join(course_difficulty, by = "course") # The course difficulty feature quantifies how challenging a course is based on student grades. 
+    ) # The course difficulty feature quantifies how challenging a course is based on student grades. 
   
   # 6. Hard Courses
   data <- data %>%
     mutate(
       hard_courses = ifelse(curricular_units_1st_sem_evaluations > 10, 1, 0)
     ) # Hard courses assume that many evaluations/tests make a course harder.
-
+  
   # 7. Discouraging Courses
-  course_grade_summary <- data %>%
-    group_by(course) %>%
-    summarize(
-      avg_course_grade = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
-      .groups = "drop"
-    )
   data <- data %>%
-    left_join(course_grade_summary, by = "course") %>%
+    group_by(course) %>%
+    mutate(
+      avg_course_grade = mean(curricular_units_1st_sem_grade, na.rm = TRUE)
+    ) %>%
+    ungroup() %>%
     mutate(
       discouraging_courses = ifelse(avg_course_grade < 10, 1, 0)
-    ) # Courses with low average grades (below the passing threshold of 10) are flagged as discouraging.
+    )# Courses with low average grades (below the passing threshold of 10) are flagged as discouraging.
   
   # 8. Historical Success
   data <- data %>%
@@ -808,17 +804,15 @@ combined_feature_engineering <- function(data) {
     ) # Summarizes overall grade performance and tracks grade changes between semesters.
   
   # 10. Prior Education Group Distributions
-  prior_education_summary <- data %>%
+  data <- data %>%
     group_by(previous_qualification) %>%
-    summarize(
+    mutate(
       prior_avg_grade_1st_sem = mean(curricular_units_1st_sem_grade, na.rm = TRUE),
       prior_std_grade_1st_sem = sd(curricular_units_1st_sem_grade, na.rm = TRUE),
       prior_avg_grade_2nd_sem = mean(curricular_units_2nd_sem_grade, na.rm = TRUE),
-      prior_std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE),
-      .groups = "drop"
-    )
-  data <- data %>%
-    left_join(prior_education_summary, by = "previous_qualification") 
+      prior_std_grade_2nd_sem = sd(curricular_units_2nd_sem_grade, na.rm = TRUE)
+    ) %>%
+    ungroup() 
   # Tracks grade patterns for students by prior education level.
   
   return(data)
@@ -829,12 +823,12 @@ combined_feature_engineering <- function(data) {
 # Apply to training data
 traindata <- combined_feature_engineering(traindata)
 
-# Apply to test data
-testdata <- combined_feature_engineering(testdata)
+# Apply to final_holdout_set
+final_holdout_set <- combined_feature_engineering(final_holdout_set)
 
 
 ################################################################################
-## Validate Feature Development on Training Data
+## Validate Feature Development on Training Data 
 ################################################################################
 ncol(traindata)
 colnames(traindata)
@@ -899,27 +893,27 @@ validate_combined_features <- function(data) {
   ))
 }
 # Apply the updated validation function
-validation_results <- validate_combined_features(traindata)
+validation_train_results <- validate_combined_features(traindata)
 
 # Total NAs in the dataset
-cat("Total NA Count:", validation_results$total_na, "\n")
+cat("Total NA Count:", validation_train_results$total_na, "\n")
 
 # NA counts per feature
-print(validation_results$na_counts)
+print(validation_train_results$na_counts)
 # The dataset only has 2 NAs. These two instances can be removed for simplicity.
 
 # Features with 100% 0s or 1s
-if (nrow(validation_results$constant_features) > 0) {
+if (nrow(validation_train_results$constant_features) > 0) {
   cat("Features with constant values (100% 0s or 1s):\n")
-  print(validation_results$constant_features$Feature)
+  print(validation_train_results$constant_features$Feature)
 } else {
   cat("No features have 100% 0s or 1s.\n")
 }
 # no features appear to have no predictive value by being entirely 0 or 1
 
 # View the plots for key features
-for (feature_name in names(validation_results$feature_plots)) {
-  print(validation_results$feature_plots[[feature_name]])
+for (feature_name in names(validation_train_results$feature_plots)) {
+  print(validation_train_results$feature_plots[[feature_name]])
 }
 
 
@@ -937,10 +931,6 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 
 
 
-#testdata <- testdata %>% drop_na() #### ADD THIS TO TEST SET CLEANING IN FUTURE SECTION IF IT DOESNT RUN WITHOUT IT
-# Revalidate the dataset to confirm no remaining NAs
-#cat("Total NA Count in Test Dataset after removal:", sum(is.na(testdata)), "\n")
-
 
 ################################################################################
 ## Choosing Classification 
@@ -957,12 +947,7 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 # This approach aligns well with the structure of the target variable and 
 # ensures predictions are interpretable and actionable.
 
-
-################################################################################
-# Model #1 Decision Tree Classification
-################################################################################
-# EXPLAIN WHY DECISION TREE WAS CHOSEN AS STARTING POINT
-
+## Splitting 'traindata' for Model Training and Evaluation
 # Step 1. Partition traindata
 set.seed(456)
 train_model_index <- createDataPartition(traindata$target, p = 0.8, list = FALSE)
@@ -970,307 +955,73 @@ training_set <- traindata[train_model_index, ]   # Model training set
 validation_set <- traindata[-train_model_index, ] # Validation set for model evaluation
 
 
-# Step 2. onvert `target` to a factor in the training and evaluation sets
+# Step 2. Convert `target` to a factor in the training and evaluation sets
 training_set$target <- as.factor(training_set$target)
 validation_set$target <- as.factor(validation_set$target)
 
 ################################################################################
-# Train a Decision Tree model using the training_set dataset
+# Model #1 Decision Tree Classification
+################################################################################
 
-# Fit the model
+## Train the Decision Tree model
+# Step 3. Train Decision Tree Model
 decision_tree_model <- rpart(
   target ~ ., 
   data = training_set, 
   method = "class"
 )
 
-# Summarize the model
-print(decision_tree_model)
+## Predict on the validation set
+dt_predictions <- predict(decision_tree_model, validation_set, type = "class")
 
-# Predict on the validation set
-validation_predictions <- predict(decision_tree_model, validation_set, type = "class")
+## Evaluate the model
+dt_conf_matrix <- confusionMatrix(dt_predictions, validation_set$target)
+print(dt_conf_matrix)
 
-# Evaluate the model
-validation_conf_matrix <- confusionMatrix(validation_predictions, validation_set$target)
-
-# Print the confusion matrix
-print(validation_conf_matrix)
-
-
-### Results
 #The model performs well in predicting students who will drop out and graduate:
   #- **81% of actual dropouts were correctly identified as dropouts (Sensitivity = 0.8122).**
   #- **73% of predicted graduates were correct (Positive Predictive Value = 0.7304).**
   
 #However, there are notable challenges:
-  #- The model entirely fails to predict the "enrolled" class (Sensitivity = 0, Precision = NaN). This suggests a lack of information or patterns in the data for this group or the impact of class imbalance.
-  #- A concerning misclassification occurs where **43 students who dropped out were classified as graduates**. This is problematic because misclassifying a dropout as a graduate could lead to overlooking at-risk students needing intervention.
+  #- The model entirely fails to predict the "enrolled" class (Sensitivity = 0, Precision = NaN). 
+  #This suggests a lack of information or patterns in the data for this group or is the impact of class imbalance (as seen below)
+  #- A concerning misclassification occurs where **43 students who dropped out were classified as graduates. 
+  #This is problematic because misclassifying a dropout as a graduate could lead to overlooking at-risk students needing intervention.
 
-### Next Steps
-  #1. Address class imbalance by oversampling the minority classes (enrolled) or try a class-weighted algorithms or resampling strategies with cross validation to balance the dataset during training. 
-    #See class imbalance below:
+## Visualize the Decision Tree
+rpart.plot(decision_tree_model, type = 2, extra = 104)
+  # As seen in the decision tree, the model used two key variables to make it's classificaitons: curricular_units_2nd_sem_approved and tuition_fees_up_to_date.
+  # These splits effectively separated dropouts (Class 1) and graduates (Class 3) but struggled to distinctly classify enrolled (Class 2) students, as evidenced by low proportions of Class 2 in terminal nodes.
+
+################################################################################
+# Model Performance
+#1. Address class imbalance by oversampling the minority classes (enrolled) or try a class-weighted algorithms or resampling strategies with cross validation to balance the dataset during training. 
+#See class imbalance below:
 table(training_set$target)
-  #2. Optimize for higher sensitivity (at the cost of some precision) since it is better to err on the side of predicting a dropout when in doubt by adjusting the decision thresholds or introduce cost-sensitive learning to penalize false negatives for the "dropout" class.
-  #3. Examine feature importance to identify why the model struggles with the "enrolled" class and refine the features to enhance separability between classes.
-
-################################################################################
-# Model #2: Decision trees with CV
-  #try above but with cross validation. sweep environment before running 
-
-################################################################################
-
-# Load necessary libraries
-library(caret)
-library(rpart)
-install.packages("rpart.plot")
-library(rpart.plot)
-
-# Step 1. Partition the dataset into training and validation sets
-set.seed(456)  # For reproducibility
-train_model_index <- createDataPartition(traindata$target, p = 0.8, list = FALSE)
-training_set <- traindata[train_model_index, ]   # Training set for model fitting
-validation_set <- traindata[-train_model_index, ] # Validation set for model evaluation
-
-# Step 2. Convert `target` to factor in both sets
-training_set$target <- as.factor(training_set$target)
-validation_set$target <- as.factor(validation_set$target)
-
-# Step 3. Define the hyperparameter grid for tuning
-# Use a range of `cp` values to explore model complexity
-hyperparameter_grid <- expand.grid(cp = seq(0.001, 0.01, by = 0.001))
-
-# Step 4. Define training control for cross-validation
-train_control <- trainControl(
-  method = "cv",         # Perform k-fold cross-validation
-  number = 10,           # Use 10 folds
-  verboseIter = TRUE     # Print progress for each fold
-)
-
-# Step 5. Train the decision tree with cross-validation
-set.seed(123)  # For reproducibility
-decision_tree_cv <- train(
-  target ~ ., 
-  data = training_set, 
-  method = "rpart",      # Decision tree model
-  trControl = train_control, 
-  tuneGrid = hyperparameter_grid  # Grid of `cp` values to test
-)
-
-# Step 6. Print cross-validation results
-print(decision_tree_cv)
-# Summarize results across all `cp` values
-print(decision_tree_cv$results)
-
-# Visualize performance across hyperparameters
-plot(decision_tree_cv)
-
-# Step 7. Extract the best hyperparameter
-best_hyperparameter <- decision_tree_cv$bestTune
-print(best_hyperparameter)  # This shows the best `cp` value
-
-# Step 8. Save the best training control and hyperparameter for reuse
-best_train_control <- trainControl(
-  method = "none",  # No further cross-validation (use all data for training)
-  verboseIter = FALSE
-)
-
-# Step 9. Refit the decision tree with the best hyperparameter on the full training set
-final_decision_tree <- train(
-  target ~ ., 
-  data = training_set, 
-  method = "rpart", 
-  trControl = best_train_control, 
-  tuneGrid = best_hyperparameter  # Use the best `cp` value
-)
-
-# Step 10. Predict on the validation set
-validation_predictions <- predict(final_decision_tree, validation_set)
-
-# Step 11. Evaluate the model's performance
-validation_conf_matrix <- confusionMatrix(validation_predictions, validation_set$target)
-print(validation_conf_matrix)
-
-# Step 12. Visualize the final decision tree
-rpart.plot(final_decision_tree$finalModel, type = 2, extra = 104)
-
-######################
-#visualize
-# Generate the confusion matrix
-conf_matrix <- confusionMatrix(data = validation_predictions, reference = validation_set$target)
-
-# Convert confusion matrix to a data frame for plotting
-conf_matrix_df <- as.data.frame(conf_matrix$table)
-
-# Create a heatmap plot for the confusion matrix)
-
-ggplot(conf_matrix_df, aes(x = Reference, y = Prediction, fill = Freq)) +
-  geom_tile(color = "white") +
-  geom_text(aes(label = Freq), color = "white", fontface = "bold") +
-  scale_fill_gradient(low = "lightblue", high = "darkblue") +
-  labs(
-    title = "Confusion Matrix Heatmap for Decision Tree Model",
-    x = "Actual Class",
-    y = "Predicted Class"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
-  )
-
-
-########visualize misclassified students:
-# Select numeric columns from the validation set for PCA
-numeric_columns <- validation_set %>%
-  select_if(is.numeric)
-
-# Run PCA on the numeric columns
-pca <- prcomp(numeric_columns, scale. = TRUE)
-
-# Create a data frame with the first two principal components
-pca_data <- as.data.frame(pca$x[, 1:2])
-colnames(pca_data) <- c("PC1", "PC2")
-
-# Add actual, predicted, and misclassified information back to the PCA data frame
-pca_data <- pca_data %>%
-  mutate(
-    actual = validation_set$target,
-    predicted = validation_predictions,
-    misclassified = ifelse(actual != predicted, "Yes", "No")
-  )
-
-# Create a scatter plot of PCA results
-ggplot(pca_data, aes(x = PC1, y = PC2, color = actual)) +
-  geom_point(alpha = 0.6) +
-  # Highlight misclassified students in red with a different shape
-  geom_point(data = pca_data %>% filter(misclassified == "Yes"), 
-             aes(x = PC1, y = PC2), color = "red", shape = 4, size = 3) +
-  labs(
-    title = "PCA of Validation Data with Misclassified Students Highlighted",
-    x = "Principal Component 1",
-    y = "Principal Component 2"
-  ) +
-  theme_minimal() +
-  theme(
-    legend.position = "bottom",
-    plot.title = element_text(size = 14, face = "bold", hjust = 0.5)
-  )
-################################################################################
-# model #3 same as above but uses bootsrapping
-################################################################################
-
-
-# Create custom resampling for bootstrapping
-custom_bootstrap <- function(data, times = 100) {
-  resampled_data <- data
-  for (i in 1:times) {
-    # Sample only the minority class ("Enrolled")
-    minority_samples <- data[data$target == "2", ]
-    
-    # Bootstrap (random sampling with replacement)
-    sampled_minority <- minority_samples[sample(nrow(minority_samples), size = nrow(minority_samples), replace = TRUE), ]
-    
-    # Add the oversampled minority back to the main data
-    resampled_data <- rbind(resampled_data, sampled_minority)
-  }
-  return(resampled_data)
-}
-
-# Perform manual resampling on the training set
-training_set_resampled <- custom_bootstrap(training_set, times = 10)
-
-# Train control with bootstrapping
-train_control_boot <- trainControl(
-  method = "boot",          # Bootstrapping method
-  number = 10,              # Number of resamples
-  verboseIter = TRUE        # Print progress
-)
-
-# Train the decision tree with bootstrapped data
-set.seed(123)
-decision_tree_bootstrap <- train(
-  target ~ ., 
-  data = training_set_resampled, # Resampled training set
-  method = "rpart", 
-  trControl = train_control_boot, 
-  tuneGrid = expand.grid(cp = seq(0.001, 0.01, by = 0.001)) # Hyperparameter grid
-)
-
-# Print the results
-print(decision_tree_bootstrap)
-
-# Summarize cross-validation results
-print(decision_tree_bootstrap$results)
-
-# Plot performance across hyperparameters
-plot(decision_tree_bootstrap)
-
-##########EXPLAIN FINDINGS
-
-
-##################################test on validation set: 
-# Step 1: Extract the best hyperparameter from the bootstrapped model
-best_hyperparameter <- decision_tree_bootstrap$bestTune
-
-# Step 2: Refit the final model using the full resampled training set and best hyperparameter
-final_decision_tree <- train(
-  target ~ ., 
-  data = training_set_resampled, # Use the resampled training set
-  method = "rpart", 
-  trControl = trainControl(method = "none"),  # No further resampling
-  tuneGrid = best_hyperparameter             # Use the best cp value
-)
-
-# Step 3: Predict on the validation set
-validation_predictions <- predict(final_decision_tree, validation_set)
-
-# Step 4: Generate the confusion matrix
-library(caret)
-validation_conf_matrix <- confusionMatrix(validation_predictions, validation_set$target)
-
-# Step 5: Print the confusion matrix
-print(validation_conf_matrix)
-
-# Step 6: Visualize the confusion matrix as a heatmap
-# Convert confusion matrix to a data frame
-conf_matrix_df <- as.data.frame(validation_conf_matrix$table)
-
-# Plot the heatmap
-library(ggplot2)
-ggplot(conf_matrix_df, aes(x = Reference, y = Prediction, fill = Freq)) +
-  geom_tile() +
-  geom_text(aes(label = Freq), color = "white") +
-  scale_fill_gradient(low = "lightblue", high = "darkblue") +
-  labs(title = "Confusion Matrix - Bootstrapped Decision Tree",
-       x = "Actual",
-       y = "Predicted") +
-  theme_minimal()
-
-
-
-
-
+#2. Optimize for higher sensitivity (at the cost of some precision) since it is better to err on the side of predicting a dropout when in doubt by adjusting the decision thresholds or introduce cost-sensitive learning to penalize false negatives for the "dropout" class.
+#3. Examine feature importance to identify why the model struggles with the "enrolled" class and refine the features to enhance separability between classes.
 
 
 ################################################################################
-# model #4 gradient boosted trees w/ CV ( w/ feature selection) 
+# Model #2: Gradient Boosted Trees with Cross-Validation
 ################################################################################
-# Define the training control
+
+## Define training control for cross-validation
 train_control_gbt <- trainControl(
   method = "cv",          # Use k-fold cross-validation
-  number = 5,            # Number of folds
-  verboseIter = TRUE      # Print training progress
+  number = 5,             # Number of folds
+  verboseIter = TRUE
 )
 
-# Define the grid of hyperparameters to tune
+## Define the grid of hyperparameters to tune
 gbt_grid <- expand.grid(
   n.trees = seq(100, 700, by = 100),  # Number of boosting iterations
-  interaction.depth = seq(1, 2, 3),  # Max depth of each tree
-  shrinkage = c(0.05, .075, 0.1),          # Learning rate
-  n.minobsinnode = c(5, 10)          # Minimum number of observations in a node
+  interaction.depth = c(1, 2, 3),     # Max depth of each tree
+  shrinkage = c(0.05, 0.075, 0.1),    # Learning rate
+  n.minobsinnode = c(5, 10)           # Minimum number of observations in a node
 )
 
-# Train the Gradient Boosted Trees model
+## Train the Gradient Boosted Trees model
 set.seed(123)
 gbt_model <- train(
   target ~ ., 
@@ -1281,25 +1032,75 @@ gbt_model <- train(
   verbose = FALSE
 )
 
-# Print the model summary
-print(gbt_model)
-
-# Summarize cross-validation results
-print(gbt_model$results)
-
-# Visualize performance across hyperparameters
-plot(gbt_model)
-##########################################
-# Predict on the validation set
+## Predict on the validation set
 gbt_predictions <- predict(gbt_model, validation_set)
 
-# Confusion matrix to evaluate performance
+## Evaluate the model
 gbt_conf_matrix <- confusionMatrix(gbt_predictions, validation_set$target)
 print(gbt_conf_matrix)
 
+# Optional: Visualize the performance of the Gradient Boosted Trees model
+plot(gbt_model)
+
+################################################################################
+# GBT Model Performance
+print(gbt_conf_matrix)
+# While the GBT model shows improved performance in predicting the “enrolled” class (Class 2) compared to the Decision Tree, it still struggled, as evidenced by its sensitivity for Class 2 being only 38.4%.
+# This suggests that the GBT model indirectly handles some aspects of class imbalance through its iterative learning process, although not directly.
+
+#The GBT model maintained strong sensitivity for Class 1 (dropout) at 75.98% and improved precision for this class (Positive Predictive Value: 84.88%) compared to the Decision Tree. As a result, the GBT model achieves a good balance of sensitivity and precision for the critical drop out class.
+# GBT implementation already demonstrates reasonable performance for sensitivity.
+
+# For  Class 2 (Enrolled), the GPT modele achieving a sensitivity of 38.40%. While this is still relatively low, it is a significant improvement over the Decision Tree model, which failed to predict any enrolled students. The specificity was 92.44%, and the positive predictive value was 52.17%.
+
+# For Class 3 (Graduate), the sensitivity was 92.07%, with a specificity of 75.99% and a positive predictive value of 79.27%. These results are comparable to those of the Decision Tree model, with a slight decrease in sensitivity but improved specificity and precision.
+
+# Overall, the GBT model outperformed the Decision Tree model, particularly in its ability to predict the enrolled class. The improved sensitivity and positive predictive value for enrolled students suggest that the GBT model is better at capturing the nuances in the data that distinguish this class. This enhancement may be attributed to the GBT model’s ability to model complex interactions and its robustness against overfitting due to cross-validation.
+
+
+################################################################################
+# Results
+################################################################################
+
+# Results Section
+
+# With two models developed and tested on the trainingsets' partitioned evaluation set,
+# it's now time to test each model on the final_holdout_set
+
+# Step 1: Feature Engineering
+#apply feature enginnering function to final_holdout_set
+combined_feature_engineering(final_holdout_set)
+# Apply the updated validation function
+validation_holdout_results <- validate_combined_features(final_holdout_set)
+cat("Total NA Count:", validation_holdout_results$total_na, "\n")
+
+# no features appear to have no predictive value by being entirely 0 or 1
+cat("Total NA Count in final_holdout_set  before removal:", sum(is.na(final_holdout_set)), "\n")
+final_holdout_set <- final_holdout_set %>% drop_na()
+cat("Total NA Count in final_holdout_set after removal:", sum(is.na(final_holdout_set)), "\n")
+
+
+# Step 2: Set Target as factor
+# Ensure the target variable in the final_holdout_set is a factor
+final_holdout_set$target <- as.factor(final_holdout_set$target)
+
+# Step 3: Predict with Decision Tree Model
+dt_holdout_predictions <- predict(decision_tree_model, final_holdout_set, type = "class")
+dt_holdout_conf_matrix <- confusionMatrix(dt_holdout_predictions, final_holdout_set$target)
+cat("Decision Tree Results on Final Holdout Set:\n")
+print(dt_holdout_conf_matrix)
+
+# Step 4: Predict with Gradient Boosted Trees Model
+gbt_holdout_predictions <- predict(gbt_model, final_holdout_set)
+gbt_holdout_conf_matrix <- confusionMatrix(gbt_holdout_predictions, final_holdout_set$target)
+cat("Gradient Boosted Trees Results on Final Holdout Set:\n")
+print(gbt_holdout_conf_matrix)
+
+
+
 ################################################################################
 # Conclusion
-
+################################################################################
 
 
 ## Limitations
@@ -1312,6 +1113,9 @@ print(gbt_conf_matrix)
   # There were many variables that were not further explored because their predictability in their current form wasn't strong enough to warent immediate feature development.
   # For instance, all the variables that feel along 0 in the plot below were largely left alone, leading to opportunity to develop new feature not yet explored.
   # Specially, creating demographic features that describe parent occupation and previsou education acheivement (qualification) could increase or decrease liklihood of success in UNiversity.
+
+  #Additional strategies (e.g., SMOTE or weighted loss functions) could further improve performance on the minority class.
+  #Neither model explicitly used techniques like oversampling, undersampling, or class-weighted learning to fully address class imbalance.
 regression_plot
 
 
@@ -1325,23 +1129,17 @@ regression_plot
 
 
 ################################################################################
-# Optional
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################################################################################################
+################################################################################
+################################################################################
 
-# Create a function for getting descriptions
-# Function to get description for a column
-get_description <- function(column_name, lookup_table) {
-  description <- lookup_table %>%
-    filter(Column == column_name) %>%
-    pull(Description)
-  
-  if (length(description) == 0) {
-    return(paste("No description found for", column_name))
-  }
-  return(description)
-}
-
-# Example usage: Get description for "Marital.status"
-get_description("Marital_status", lookup_table)
 
 # Citations
-SOURCE: U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
+# SOURCE: U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
