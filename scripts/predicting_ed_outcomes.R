@@ -1,7 +1,7 @@
 # Predicting College Graduation Analysis
 # Introduction
 # This script processes the “Predict Students’ Dropout and Academic Success” dataset, 
-# developed by Realinho and colleagues (2021). It includes feature engineering and 
+# developed by Martins and colleagues (2021). It includes feature engineering and 
 # utilizes ________ models to predict student outcomes: college graduation, dropout, or enrollment.
 # College is not only an expensive edevour, it's also predicting of long-term helth outcomes and income. As such
 # being able to predict dropout before it happens could allow for early intervention programs
@@ -12,8 +12,15 @@
 # counselors, administrators, and teachers and ultimately students by informing who might needs the most help.
 
 ## The data set
-  # describe dataset, it's origins, and size
-#"different undergraduate degrees, such as agronomy, design, education, nursing, journalism, management, social service, and technologies. The dataset includes information known at the time of student enrollment (academic path, demographics, and social-economic factors) and the students' academic performance at the end of the first and second semesters. The data is used to build classification models to predict students' dropout and academic sucess. The problem is formulated as a three category classification task, in which there is a strong imbalance towards one of the classes." - plagerism rn... cite
+  # This dataset comes from Martins and colleagues (2021) and from a single Poruguese University. The data
+  # only includes three categories of information known at the start of a students academic path at the university:
+  #- academic performance, 
+  #- demographics
+  #- socio-economic factors
+# The degrees of study within the dataset include: "agronomy, design, education, nursing, journalism, management, social service, and technologies" (Martins and colleagues, 2021).
+# In terms of size the dataset contains 37 features and 4424 student. 
+# More details on the dataset are explore in the exploration subsection of the method section.
+
 # Requirements:
 # - Ensure necessary libraries are installed (see library loading section)(should be automated).
 # - If you've downloaded the entire repository then the code should run fine. 
@@ -25,7 +32,7 @@
 ################################################################################
 
 # List of required packages
-packages <- c("readr", "gbm", "tinytex", "dplyr", "caret", "rpart", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
+packages <- c("readr", "gbm", "tinytex", "rpart.plot", "dplyr", "caret", "rpart", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
 
 # Check and install missing packages
 for (pkg in packages) {
@@ -63,6 +70,7 @@ variable_table <- read_csv(variable_table_path)
   #include spaces and parenthesis. All of which will cause issues with analysis later on.
 cat("Column names in `data` before cleaning:\n")
 colnames(data)
+nrow(data)
 cat("\nColumn names in `variable_table` before cleaning:\n")
 colnames(variable_table)
 cat("\nVariable names in `variable_table` before cleaning:\n")
@@ -222,7 +230,6 @@ formula_train <- as.formula(formula_string_train)
 
 # Perform linear regression
 value1 <- lm(formula_train, data = traindata)
-summary(value1)#prolly don't need this summary... chatgpt help me make sense of this summary
 
 # Visualize the coefficients
 regression_plot<-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
@@ -233,8 +240,6 @@ regression_plot
 # crossing zero, suggesting limited or no effect.
 
 # Key Findings:
-# - **Strong Predictors (Positive Association):**
-
 # Due to the positive coefficients, the plot suggests focusing on variables such as:
 # `tuition_fees_up_to_date`, `international`, 
 # `curricular_units_2nd_sem_approved`, `scholarship_holder`, 
@@ -269,8 +274,9 @@ continuous_vars <- c("admission_grade", "curricular_units_1st_sem_grade", "gdp")
 ######################################
 # Binary variables
 
+# Since all variables are encoded numerically, the following code will tell us what the binary values mean.
 
-# Select specific rows and print only the Variable_Name and Description columns
+# Print Binary variable definitions
 variable_table %>%
   slice(c(14:19, 21)) %>%  # Select rows 14 to 19 and 21
   select(variable_name, description) %>%  # Select specific columns
@@ -485,43 +491,6 @@ units_distributed
 # without more context into what units credited means, it's hard to draw conclusions.
 
 # Again, average grades are only just above 10/20 in semester 1, with some more variablility in semester 2, but a similar average.
-
-
-
-#compare above to dropout and graduate
-
-# Filter and summarize for dropout students
-dropout_summary <- traindata %>%
-  filter(target == 1) %>%
-  select(all_of(continuous_vars)) %>%
-  pivot_longer(cols = everything(), names_to = "Variable_Name", values_to = "Value") %>%
-  mutate(Semester = if_else(str_detect(Variable_Name, "1st"), "1st Semester", "2nd Semester")) %>%
-  group_by(Semester, Variable_Name) %>%
-  summarize(
-    Mean_Dropout = mean(Value, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Filter and summarize for graduated students
-graduated_summary <- traindata %>%
-  filter(target == 3) %>%
-  select(all_of(continuous_vars)) %>%
-  pivot_longer(cols = everything(), names_to = "Variable_Name", values_to = "Value") %>%
-  mutate(Semester = if_else(str_detect(Variable_Name, "1st"), "1st Semester", "2nd Semester")) %>%
-  group_by(Semester, Variable_Name) %>%
-  summarize(
-    Mean_Graduated = mean(Value, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Merge the summaries and calculate differences
-dropout_with_diff_summary <- dropout_summary %>%
-  left_join(graduated_summary, by = c("Semester", "Variable_Name")) %>%
-  mutate(Difference_Graduated_vs_Dropout = Mean_Graduated - Mean_Dropout) %>%
-  select(Semester, Variable_Name, Mean_Dropout, Mean_Graduated, Difference_Graduated_vs_Dropout)
-
-# Print the final table
-print(dropout_with_diff_summary)
 
 
 ################################################################################
@@ -759,19 +728,8 @@ feature_engineering <- function(data) {
 }
 
 
-### Separately apply the combined function to the training data and the final_holdout_Set
-
 # Apply to training data
 traindata <- feature_engineering(traindata)
-
-# Apply to final_holdout_set
-final_holdout_set <- feature_engineering(final_holdout_set)
-  # Note, although the feature engineering come back to oORDER ON THIS ONE HEREEEEEEE
-
-
-
-
-
 
 
 ################################################################################
@@ -959,16 +917,14 @@ print(dt_conf_matrix)
 
 ## Visualize the Decision Tree
 rpart.plot(decision_tree_model, type = 2, extra = 104)
-  # As seen in the decision tree, the model used two key variables to make it's classificaitons: curricular_units_2nd_sem_approved and tuition_fees_up_to_date.
-  # These splits effectively separated dropouts (Class 1) and graduates (Class 3) but struggled to distinctly classify enrolled (Class 2) students, as evidenced by low proportions of Class 2 in terminal nodes.
-
-################################################################################
-# Model Performance
-#1. Address class imbalance by oversampling the minority classes (enrolled) or try a class-weighted algorithms or resampling strategies with cross validation to balance the dataset during training. 
-#See class imbalance below:
-table(training_set$target)
-#2. Optimize for higher sensitivity (at the cost of some precision) since it is better to err on the side of predicting a dropout when in doubt by adjusting the decision thresholds or introduce cost-sensitive learning to penalize false negatives for the "dropout" class.
-#3. Examine feature importance to identify why the model struggles with the "enrolled" class and refine the features to enhance separability between classes.
+# As seen in the decision tree, the model used two key variables to make it's classificaitons: 
+#- curricular_units_2nd_sem_approved
+#- tuition_fees_up_to_date.
+# These splits effectively separated dropouts (Class 1) and graduates (Class 3), 
+# but struggled to distinctly classify enrolled (Class 2) students, 
+# as evidenced by low proportions of Class 2 in terminal nodes. 
+# Unfortunately, this means the model decided the rest of the features were not helpful. 
+# This is called overfitting when the model assumes the other variables are just noise and not worth listening to.
 
 
 ################################################################################
@@ -1124,7 +1080,11 @@ print(gbt_conf_matrix_plot)
 ################################################################################
 # Conclusion
 ################################################################################
-# In conclusion, the performance of these two models are mediocre at best. Due to class imbalance, precision/pos predictive value is one of the best measures of success. 
+# Sumamary
+
+# In conclusion, this report has cleaned the dataset, explored the variables, built new features, and developed two mmachine learning models
+# to predict student outcomes at university (dropout, enrolled, graduate). The two models developed were decision trees & gradiaent boosted trees.
+# The performance of these two models are mediocre at best. Due to class imbalance, precision/pos predictive value is one of the best measures of success. 
 # As shown above, GBT performs much better than decision trees in this regaard (DT = 0.7267      NaN   0.7329) vs (GPT = 0.7695  0.50000   0.8148).
 # This difference is largely due to cross validation and the use of boosted sampling for mis-classified target in it's training. 
 # However, with GBT only identified 38% of enrolled students (sensitivity), as a result, the model is left wanting. 
@@ -1144,7 +1104,6 @@ table(traindata$target)
 # With 62 features interacting to predict educational outcomes on a training dataset with 3539 students, 
 # only 647 currently enrolled, vs 1124 dropout and 1768 graduate both models were over-fitting due to this low prevelance.
 
-# 7. Uncertainty in "Units Credited":
 # Most students on average were earning 0 credits, which may reflect graduates who are no longer earning credits or students who have dropped out. 
 # This pattern may not accurately represent currently enrolled students, who are the smallest group. Without more context about what "units credited" means, 
 # it is difficult to draw clear conclusions.
@@ -1167,30 +1126,7 @@ table(traindata$target)
   # This would give counselors information they could act on.
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 ################################################################################
-################################################################################
-################################################################################
-################################################################################
-################################################################################
-################################################################################
-################################################################################
-################################################################################
-################################################################################################################################################################
-################################################################################
-################################################################################
-
-
 # Citations
-# SOURCE: U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
+# Realinho, V., Vieira Martins, M., Machado, J., & Baptista, L. (2021). Predict Students' Dropout and Academic Success [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5MC89.
+# U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
