@@ -42,19 +42,74 @@ for (pkg in packages) {
 }
 
 # Load the libraries
-lapply(packages, library, character.only = TRUE)
+invisible(lapply(packages, library, character.only = TRUE))
 
 ################################################################################
-# Download data & variable table
+# Download and unzip Repository
 ################################################################################
+##########Test###########
+
+################################################################################
+# Download and Unzip Repository
+################################################################################
+
+# Define the GitHub repository URL and destination path
+repo_url <- "https://github.com/your-username/your-repository/archive/main.zip"
+zip_file <- here("data", "repository.zip")
+unzip_dir <- here("data", "repository")
+
+# Check if the repository is already downloaded
+if (!file.exists(zip_file)) {
+  cat("Downloading the repository...\n")
+  download.file(repo_url, zip_file, mode = "wb")
+}
+
+# Check if the repository is already unzipped
+if (!dir.exists(unzip_dir)) {
+  cat("Unzipping the repository...\n")
+  unzip(zip_file, exdir = here("data"))
+}
+
+################################################################################
+# Load Data and Variable Table
+################################################################################
+
+# Set up the file paths for the data files
+data_path <- file.path(unzip_dir, "data.csv")
+variable_table_path <- file.path(unzip_dir, "variable_table.csv")
+
+# Check if the files exist in the expected location
+if (!file.exists(data_path)) {
+  stop("The file 'data.csv' is not found in the unzipped repository folder. 
+       Please check the repository structure.")
+}
+
+if (!file.exists(variable_table_path)) {
+  stop("The file 'variable_table.csv' is not found in the unzipped repository folder. 
+       Please check the repository structure.")
+}
+
+# Load the datasets
+data <- read.csv(data_path, header = TRUE, sep = ";")
+variable_table <- read_csv(variable_table_path)
+
+cat("Data and variable table loaded successfully.\n")
+
+###########################Below works... but not for zip files#####
 
 # Set up the file paths for the data files
 data_path <- here("data", "data.csv")
 variable_table_path <- here("data", "variable_table.csv")
 
-# Check if the file exists in the expected location
+# Check if the data file exists in the expected location
 if (!file.exists(data_path)) {
   stop("The file 'data.csv' is not found in the 'data' folder. 
+       Please ensure the file is placed in the 'data' folder inside the 'predicting_ed_outcomes' repository.")
+}
+
+# Check if the variable table file exists in the expected location
+if (!file.exists(variable_table_path)) {
+  stop("The file 'variable_table.csv' is not found in the 'data' folder. 
        Please ensure the file is placed in the 'data' folder inside the 'predicting_ed_outcomes' repository.")
 }
 
@@ -77,8 +132,7 @@ cat("\nVariable names in `variable_table` before cleaning:\n")
 print(variable_table$`Variable Name`)
 
 
-# In order to remove these problematic characters, the following regex code removes them.
-# Define a function to clean column names by removing problematic characters
+# In order to remove these problematic characters, the following function and regex code removes them.
 clean_names <- function(names) {
   names %>%
     # Convert to lowercase
