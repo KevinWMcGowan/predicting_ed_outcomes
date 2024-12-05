@@ -1,25 +1,9 @@
 # Predicting College Graduation Analysis
-# Introduction
+
 # This script processes the “Predict Students’ Dropout and Academic Success” dataset, 
 # developed by Martins and colleagues (2021). It includes feature engineering and 
-# utilizes ________ models to predict student outcomes: college graduation, dropout, or enrollment.
-# College is not only an expensive edevour, it's also predicting of long-term helth outcomes and income. As such
-# being able to predict dropout before it happens could allow for early intervention programs
-# to support students towards success. 
-# Knowing universities have thousands of students, and only a few counselors in some cases, a predictive model
-# like the one develoed below, would be immensly helpful in giving counselors a place to start.
-# With this desired end in mind, the following reports aims to support
-# counselors, administrators, and teachers and ultimately students by informing who might needs the most help.
-
-## The data set
-  # This dataset comes from Martins and colleagues (2021) and from a single Poruguese University. The data
-  # only includes three categories of information known at the start of a students academic path at the university:
-  #- academic performance, 
-  #- demographics
-  #- socio-economic factors
-# The degrees of study within the dataset include: "agronomy, design, education, nursing, journalism, management, social service, and technologies" (Martins and colleagues, 2021).
-# In terms of size the dataset contains 37 features and 4424 student. 
-# More details on the dataset are explore in the exploration subsection of the method section.
+# utilizes decision tree and gradient boosted trees with cross validation models 
+# to predict 3 levels of student outcomes: college graduation, dropout, or enrollment.
 
 # Requirements:
 # - Ensure necessary libraries are installed (see library loading section)(should be automated).
@@ -1021,7 +1005,6 @@ gbt_model <- train(
 cat("Best Model Parameters from Cross-Validation:\n")
 print(gbt_model$bestTune)
 
-
 ## Predict on the validation set
 gbt_predictions <- predict(gbt_model, validation_set)
 
@@ -1029,55 +1012,68 @@ gbt_predictions <- predict(gbt_model, validation_set)
 gbt_conf_matrix <- confusionMatrix(gbt_predictions, validation_set$target)
 print(gbt_conf_matrix)
 
-# Optional: Visualize the performance of the Gradient Boosted Trees model
+# Dropout (Class 1)
+# The GBT model achieves a sensitivity of 75.55% for predicting dropouts, 
+# indicating strong performance in identifying students who are likely to drop out.
+# Precision (Positive Predictive Value) for this class is 82.38%, showing good reliability 
+# in the model's dropout predictions. These results suggest that the GBT model balances 
+# sensitivity and precision effectively for the critical dropout category.
+
+# Enrolled (Class 2)
+# For the enrolled class, sensitivity improves to 41.60% compared to 0% in the Decision Tree model.
+# While this is an improvement, it still reflects challenges in accurately identifying enrolled students.
+# Specificity remains high at 92.44%, indicating the model's ability to correctly exclude non-enrolled students.
+# Precision (Positive Predictive Value) for this class is 54.17%, showing moderate reliability 
+# in enrolled predictions. The results suggest the GBT model partially addresses class imbalance, 
+# though further improvements are needed for this minority class.
+
+# Graduate (Class 3)
+# The GBT model shows strong sensitivity for graduates at 92.07%, effectively identifying students likely to graduate.
+# Specificity for this class is 78.53%, with a precision of 81.05%, indicating good reliability in graduate predictions.
+# These results maintain strong performance for the graduate class, with slight improvements in specificity 
+# over the Decision Tree model, albeit with a small trade-off in sensitivity.
+
+# Visualize the performance of the Gradient Boosted Trees model
 plot(gbt_model)
-  # The plot shows that boosting iteraction (x-axis) did greatly impact accuracy (as seen on y axis)
-  # fora ll three outcomes (dropout=1, enrolled =2, graduated =3).
-  # Cross validation automatically picked the best tune that optimizes for the best outcoems across all 2.
-  # The chart shows that the three values align best around 200 trees, a depth of 3, shrinkage of .05
-  # and 10 obsevations per node.
+# The plot shows that boosting iterations (x-axis) did greatly impact accuracy (as seen on y axis)
+# fora ll three outcomes (dropout=1, enrolled =2, graduated =3).
+# Cross validation automatically picked the best tune that optimizes for the best outcoems across all 2.
+# The chart shows that the three values align best around 200 trees, a depth of 3, shrinkage of .05
+# and 10 observations per node.
 
-################################################################################
-# GBT Model Performance
-print(gbt_conf_matrix)
-# While the GBT model shows improved performance in predicting the “enrolled” class (Class 2) compared to the Decision Tree, it still struggled, as evidenced by its sensitivity for Class 2 being only 38.4%.
-# This suggests that the GBT model use of additional trees handles some aspects of class imbalance through its iterative learning process, although not with 100% success.
+# Overall, the GBT model outperformed the Decision Tree model, 
+# particularly in its ability to predict the enrolled class. 
 
-#The GBT model maintained strong sensitivity for Class 1 (dropout) at 75.98% and improved precision for this class (Positive Predictive Value: 84.88%) compared to the Decision Tree. As a result, the GBT model achieves a good balance of sensitivity and precision for the critical drop out class.
-# GBT implementation already demonstrates reasonable performance for sensitivity.
-
-# For  Class 2 (Enrolled), the GPT model achieving a sensitivity of 38.40%. While this is still relatively low, it is a significant improvement over the Decision Tree model, which failed to predict any enrolled students. The specificity was 92.44%, and the positive predictive value was 52.17%.
-
-# For Class 3 (Graduate), the sensitivity was 92.07%, with a specificity of 75.99% and a positive predictive value of 79.27%. These results are comparable to those of the Decision Tree model, with a slight decrease in sensitivity but improved specificity and precision.
-
-# Overall, the GBT model outperformed the Decision Tree model, particularly in its ability to predict the enrolled class. The improved sensitivity and positive predictive value for enrolled students suggest that the GBT model is better at capturing the nuances in the data that distinguish this class. 
-# This enhancement may be attributed to the GBT model’s ability to model complex interactions and its robustness against overfitting due to cross-validation.
 
 
 ################################################################################
 # Results
 ################################################################################
+colnames(final_holdout_set)
 
 # Results Section
 
-# With two models developed and tested on the trainingsets' partitioned evaluation set,
+# With two models developed and tested on the training sets' validation_set,
 # it's now time to test each model on the final_holdout_set
 
-# Step 1: Feature Engineering
-#apply feature engineering function to final_holdout_set
-feature_engineering(final_holdout_set)
+# Step 1: Set Target as factor (consider moving above of feature engineering)
+# Ensure the target variable in the final_holdout_set is a factor
+final_holdout_set$target <- as.factor(final_holdout_set$target)
+
+# Step 2: Feature Engineering
+# Apply feature engineering function to final_holdout_set
+final_holdout_set <- feature_engineering(final_holdout_set)
+
 # Apply the feature engineering validation function
 validation_holdout_results <- validate_features(final_holdout_set)
 
-# There are 8 NAs. A negligable amount. So they are dropped
+
+#There are 8 NAs. A negligable amount. So they are dropped
 cat("Total NA Count in final_holdout_set  before removal:", sum(is.na(final_holdout_set)), "\n")
 final_holdout_set <- final_holdout_set %>% drop_na()
 cat("Total NA Count in final_holdout_set after removal:", sum(is.na(final_holdout_set)), "\n")
 
 
-# Step 2: Set Target as factor
-# Ensure the target variable in the final_holdout_set is a factor
-final_holdout_set$target <- as.factor(final_holdout_set$target)
 
 # Step 3: Predict with Decision Tree Model
 dt_holdout_predictions <- predict(decision_tree_model, final_holdout_set, type = "class")
@@ -1093,6 +1089,7 @@ print(gbt_holdout_conf_matrix)
 # The results above show, in terms of balanced accuracy, the boosted tree model was able to maintain similar performance to the DT model
 # in predicting dropout (GBT = .81 vs DT = .81) and enrolled (GBT = .85 vs DT = .80)  while making up 15% in enrolled (GBT = .65 vs DT = .50).
 # This difference is certainly attributed to cross validations and the boosted resampling. 
+
 
 
 ## Step 5: Visualize GBT & Decision Tree Performance on Final Holdout

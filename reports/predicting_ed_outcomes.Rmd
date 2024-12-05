@@ -367,7 +367,8 @@ A few powerful takeaways include:
 - A similar number of students without scholarships dropped out (1287) as those who graduated (1374), suggesting scholarships are not as predictive as debtors.
 
 ### Scholarship VS Dropout
-Below, one can see the rate of scholarship holders dropping out (12%) is much lower than that of non_scholarship holders (38%). 
+Below, one can see the rate of scholarship holders dropping out (12%) is much lower than that of non_scholarship holders (38%).
+
 ```{r Scholarship Comparison to Dropout, echo=TRUE}
 # Compare scholarship holder drop out vs non_scholarship holder dropout
 scholarship_holder_rate <- binary_target_table %>%
@@ -1028,7 +1029,7 @@ print(gbt_conf_matrix)
 ```{r Plot GBT Performance, echo=TRUE}
 plot(gbt_model)
 ```
-The plot shows that boosting iteraction (x-axis) did greatly impact accuracy (as seen on y axis) for all three outcomes (dropout=1, enrolled =2, graduated =3). Cross validation automatically picked the best tune that optimizes for the best outcoems across all 2. The chart shows that the three values align best around 200 trees, a depth of 3, shrinkage of .05 and 10 obsevations per node.
+The plot shows that boosting iteraction (x-axis) did greatly impact accuracy (as seen on y axis) for all three outcomes (dropout=1, enrolled =2, graduated =3). Cross validation automatically picked the best tune that optimizes for the best outcomes across all 2. The chart shows that the three values align best around 200 trees, a depth of 3, shrinkage of .05 and 10 observations per node.
 
 Overall, the GBT model outperformed the Decision Tree model, particularly in its ability to predict the enrolled class. The improved sensitivity and positive predictive value for enrolled students suggest that the GBT model is better at capturing the nuances in the data that distinguish this class. This enhancement may be attributed to the GBT model’s ability to model complex interactions and its robustness against overfitting due to cross-validation.
 
@@ -1042,7 +1043,7 @@ Starting with feature engineering and NA check on the final holdout set
 ```{r Develop Features and Remove NAs on Final_Holdout_set, echo=TRUE}
 # Step 1: Feature Engineering
 #apply feature engineering function to final_holdout_set
-feature_engineering(final_holdout_set)
+final_holdout_set <- feature_engineering(final_holdout_set)
 # Apply the feature engineering validation function
 validation_holdout_results <- validate_features(final_holdout_set)
 
@@ -1056,7 +1057,7 @@ cat("Total NA Count in final_holdout_set after removal:", sum(is.na(final_holdou
 final_holdout_set$target <- as.factor(final_holdout_set$target)
 ```
 
-With the final holdout set now having the same treatment as the traindata set, predictions can be made.
+With the final holdout set now having the same treatment as the traindata set from which the models were developed, predictions can be made.
 
 ```{r Predict Target with both the DT and GBT Models, echo=TRUE}
 # Predict with Decision Tree Model
@@ -1065,7 +1066,7 @@ dt_holdout_conf_matrix <- confusionMatrix(dt_holdout_predictions, final_holdout_
 cat("Decision Tree Results on Final Holdout Set:\n")
 print(dt_holdout_conf_matrix)
 
-# redict with Gradient Boosted Trees Model
+# Predict with Gradient Boosted Trees Model
 gbt_holdout_predictions <- predict(gbt_model, final_holdout_set)
 gbt_holdout_conf_matrix <- confusionMatrix(gbt_holdout_predictions, final_holdout_set$target)
 cat("Gradient Boosted Trees Results on Final Holdout Set:\n")
