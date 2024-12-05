@@ -28,9 +28,9 @@ This Predicting_ed_outcomes project report, is part of the HarvardX: PH125.9x Da
 
 # Introduction
 
-This report processes the “Predict Students’ Dropout and Academic Success” dataset, developed by Martins et al. (2021). It includes data cleaning, exploratory data analysis, feature engineering, and utilizes advanced machine learning models to predict student outcomes: college graduation, dropout, or enrolled. 
+This report processes the “Predict Students’ Dropout and Academic Success” dataset, developed by Martins et al. (2021). It includes feature engineering and utilizes advanced machine learning models to predict student outcomes: college graduation, dropout, or enrollment. 
 
-College is not only an expensive endeavor but the US Department of Health and Human Services reports that college is also predictive of long-term health outcomes and income (2023). As such, being able to predict dropout before it happens could enable early intervention programs that support students toward success. With universities often having thousands of students and only a few counselors, a predictive model like the one developed here could be immensely helpful in giving counselors a prioritized starting point for their efforts.
+College is not only an expensive endeavor but also predictive of long-term health outcomes and income. As such, being able to predict dropout before it happens could enable early intervention programs that support students toward success. With universities often having thousands of students and only a few counselors, a predictive model like the one developed here could be immensely helpful in giving counselors a prioritized starting point for their efforts.
 
 This report aims to support counselors, administrators, and teachers by identifying which students might need the most help. Ultimately, the goal is to ensure better outcomes for students by leveraging predictive insights.
 
@@ -65,7 +65,7 @@ Before training the education outcome models out of the Martins and colleagues (
 
 ```{r install & load the required packages, echo=FALSE, warning=FALSE, results='hide', message=FALSE}
 # List of required packages
-packages <- c("readr", "gbm", "tinytex", "rpart.plot", "dplyr", "caret", "rpart", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
+packages <- c("readr", "gbm", "rpart.plot", "tinytex", "dplyr", "caret", "rpart", "stringr", "tidyverse", "tidyr", "broom", "glmnet", "Matrix","coefplot", "here")
 
 # Check and install missing packages
 for (pkg in packages) {
@@ -75,64 +75,32 @@ for (pkg in packages) {
 }
 
 # Load the libraries
-invisible(lapply(packages, library, character.only = TRUE))
+lapply(packages, library, character.only = TRUE)
 ```
 
 ### Load Data & Variable Table from Repo Zip File
 
 This report, and it's associated R script, are set up to run with local directories. As such, the zip file should be downloaded as described in the README file. If done so, the following will run.
 
-```{r Download and Unzip Repository from Github, echo=TRUE}
-# Define the GitHub repository URL and destination path
-repo_url <- "https://github.com/KevinWMcGowan/predicting_ed_outcomes/archive/refs/heads/main.zip"
-zip_file <- here("data", "predicting_ed_outcomes-main.zip")
-unzip_dir <- here("data", "predicting_ed_outcomes-main")
+```{r Unzip and Load Data from Github Repo Zip Filem, echo=TRUE}
+# #Unzip file
+############################################??
+# Set local directory path
+data_path <- here("data", "data.csv")
+variable_table_path <- here("data", "variable_table.csv")
 
-# Check if the repository is already downloaded
-if (!file.exists(zip_file)) {
-  cat("Downloading the repository...\n")
-  download.file(repo_url, zip_file, mode = "wb")
-}
-
-# Check if the repository is already unzipped
-if (!dir.exists(unzip_dir)) {
-  cat("Unzipping the repository...\n")
-  unzip(zip_file, exdir = here("data"))
-}
-```
-
-With the repository downloaded and unzipped, the following code loads the two data tables into the environment: the numerically coded data.csv and the definitions in teh variable_table:
-```{r Load Datasets, echo=TRUE}
-# Define the paths to the data folder within the unzipped repository
-data_folder <- file.path(unzip_dir, "data")  # Path to the "data" folder
-data_path <- file.path(data_folder, "data.csv")
-variable_table_path <- file.path(data_folder, "variable_table.csv")
-
-# Check if the "data" folder exists
-if (!dir.exists(data_folder)) {
-  stop("The 'data' folder is not found in the unzipped repository. 
-       Please check the repository structure.")
-}
-
-# Check if data.csv exist in the "data" folder
+# Check if the file exists in the expected location
 if (!file.exists(data_path)) {
   stop("The file 'data.csv' is not found in the 'data' folder. 
-       Please ensure it exists in the repository structure.")
-}
-
-# Check if variable_table.csv exists in teh "data" folder
-if (!file.exists(variable_table_path)) {
-  stop("The file 'variable_table.csv' is not found in the 'data' folder. 
-       Please ensure it exists in the repository structure.")
+       Please ensure the file is placed in the 'data' folder inside the 'predicting_ed_outcomes' repository.")
 }
 
 # Load the datasets
 data <- read.csv(data_path, header = TRUE, sep = ";")
 variable_table <- read_csv(variable_table_path)
-
-cat("Data and variable table loaded successfully from the 'data' folder.\n")
-
 ```
+
+
 ### Clean the datasets
 
 As seen below, the column names in data table and the variable and the variable_name column include spaces and parenthesis. All of which will cause issues with analysis later on.
@@ -185,7 +153,7 @@ The code above shows that all 37 variable names are now matching.
 
 ### Encode Target as Numeric
 
-As seen in the table below, like the other variables in the dataset, Target is now encoded numerically: 
+As seen in the table below, only Target is not encoded numerically. 
 ```{r Inspect Target and Convert to Numeric, echo=TRUE}
 # Encode 'target' variable with a numeric representation
 data$target <- ifelse(data$target == "Dropout", 1,
@@ -199,18 +167,10 @@ The target variable is now numeric:
 - "Enrolled" -> 2
 - "Graduate" -> 3
 
-Next, the dataset is split to avoid overtraining and other validation challenges with model training.
 
+## Split the dataset
 
-## Split the dataset & Justify
-
-Now before any analysis or exploration can be done, the best practice is to split the dataset in order to avoid over training. A quick inspection of the dataset shows a relatively small dataset for model training (4435 instances) and a strong class imbalance (Dropout = 1421, Enrolled = 794, Graduated = 2209). This imbalance and small sample size will inform the splitting of the data for training and testing, and the modeling techniques used in the method section of this report.
-```{r Quickly Inspect The Data, echo=TRUE}
-nrow(data)
-table(data$target)
-```
-
-A 20% holdout set is reserved before final testing, ensuring the dataset's class distribution is maintained, sufficient representation for all three outcome classes are retained, and 80% of the data can be used for training and validation. 
+Now before any analysis or exploration can be done, the best practice is to split the dataset in order to avoid over training.
 ```{r Split The Dataset into traindata & final_holdout_set,echo=TRUE}
 set.seed(123)  
 trainindex <- createDataPartition(data$target, p = .8, 
@@ -228,7 +188,6 @@ total_nas_final_holdout_set <- sum(is.na(final_holdout_set))
 cat("Total NAs in final_holdout_set data:", total_nas_final_holdout_set, "\n")
 ```
 
-From here on, this report will only work with the traindata set. This will prevent any patterns and observations about the holdoutset from informing the training of the learning models. In this way, the final holdout set will be an independent test of model effectriveness. 
 
 ## Exploratory Data Analysis
 
@@ -275,14 +234,14 @@ regression_plot<-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
 regression_plot
 ```
 
-The coefficient plot above provides insights into the variables' relationships with the target outcomes and their relative strengths. It highlights variables with significant predictive power, as well as those with wide error margins crossing zero, suggesting limited or no effect.
+The coefficient plot above provides insights into the variables' relationships with the target outcome and their relative strengths. It highlights variables with significant predictive power, as well as those with wide error margins crossing zero, suggesting limited or no effect.
 
 ### Key Regression Findings:
 - **Strong Predictors (Positive Association):**
 Due to the positive coefficients, the plot suggests focusing on variables such as:
 `tuition_fees_up_to_date`, `international`, `curricular_units_2nd_sem_approved`, `scholarship_holder`, `daytime_evening_attendance`, and `curricular_units_1st_sem_approved` These range approximately from 0.1 to 0.5, indicating a positive contribution toward favorable outcomes like graduation or enrollment.
 
-Conversely, certain factors show negative correlations with the target, as indicated by their negative coefficients. These include:`gender`, `curricular_units_1st_sem_credited`, `curricular_units_2nd_sem_credited`, `educational_special_needs`, `debtor`, and `curricular_units_2nd_sem_enrolled`. These insights suggest these variables are just as important, because they may be associated with lower values of target, such as dropout and enrolled.
+Conversely, certain factors show negative correlations with the target, as indicated by their negative coefficients. These include:`gender`, `curricular_units_1st_sem_credited`, `curricular_units_2nd_sem_credited`, `educational_special_needs`, `debtor`, and `curricular_units_2nd_sem_enrolled`. These insights suggest these variables may be associated with lower values of target, such as dropout and enrolled.
 
 Together, these findings provide a foundation for deeper exploration into how these variables influence the target outcomes and how they can be utilized effectively in predictive modeling.
 
@@ -343,7 +302,7 @@ ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
   )
 ```
 
-The chart above shows that the vast majority of students are not debtor (don't owe money to school), nor special needs. Most are male, aren't international, or scholarship holders. These findings warrant more digging, since the regression above found all but gender to be predictive of the target variable.
+The chart above shows that the vast majority of students are not debtor (don't owe money to school), nor special needs, most are male, aren't international, or scholarship holders. This finding warrants more digging, since the regression above found all but gender to be predictive of our target variable.
 
 Below, the chart compares the same variables against the 3 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
 ```{r Create Table of Binary vs Target Levels}
@@ -364,7 +323,7 @@ The chart above reflects the regression above that these variables do have a hig
 
 A few powerful takeaways include: 
 - A significant number of students who dropped out (312) were debtors compared to those who graduated (101) or are still enrolled (90).
-- A similar number of students without scholarships dropped out (1287) as those who graduated (1374), suggesting scholarships are not as predictive as debtors.
+- A similar number of students without scholarships dropped out (1287) as those who graduated (1374). 
 
 ### Scholarship VS Dropout
 Below, one can see the rate of scholarship holders dropping out (12%) is much lower than that of non_scholarship holders (38%). 
@@ -954,12 +913,10 @@ table(training_set$target)
 ```{r Visualize DT Performance, echo=TRUE}
 rpart.plot(decision_tree_model, type = 2, extra = 104)
 ```
-As seen in the decision tree, the model used two key variables to make it's classifications: 
-- curricular_units_2nd_sem_approved
+As seen in the decision tree, the model used two key variables to make it's classificaitons: - curricular_units_2nd_sem_approved
 - tuition_fees_up_to_date.
 These splits effectively separated dropouts (Class 1) and graduates (Class 3) but struggled to distinctly classify enrolled (Class 2) students, as evidenced by low proportions of Class 2 in terminal nodes. Unfortunately, this means the model decided the rest of the features were not helpful. This is called overfitting when the model assumes the other variables are just noise and not worth listening to. 
 
-Practically, this finding tells counselors to focus on students who are not approved for at least 4 credits in their second semester, and who do not have their tuition fees up to date as these students are most likely to be dropout. 
 
 ## Model #2: Gradient Boosted Trees with Cross-Validation
 
@@ -1151,7 +1108,6 @@ Lastly, a probabilistic approach, such as multinomial logistic regression, could
 # Citations
 - Realinho, V., Vieira Martins, M., Machado, J., & Baptista, L. (2021). Predict Students' Dropout and Academic Success [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5MC89.
 - U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
-- US Department of Health and Human Services. (2023). Enrollment in higher education. Enrollment in Higher Education - Healthy People 2030. https://odphp.health.gov/healthypeople/priority-areas/social-determinants-health/literature-summaries/enrollment-higher-education 
 
 
 

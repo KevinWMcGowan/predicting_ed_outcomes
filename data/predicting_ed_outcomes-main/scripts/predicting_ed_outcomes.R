@@ -54,9 +54,9 @@ invisible(lapply(packages, library, character.only = TRUE))
 ################################################################################
 
 # Define the GitHub repository URL and destination path
-repo_url <- "https://github.com/KevinWMcGowan/predicting_ed_outcomes/archive/refs/heads/main.zip"
-zip_file <- here("data", "predicting_ed_outcomes-main.zip")
-unzip_dir <- here("data", "predicting_ed_outcomes-main")
+repo_url <- "https://github.com/your-username/your-repository/archive/main.zip"
+zip_file <- here("data", "repository.zip")
+unzip_dir <- here("data", "repository")
 
 # Check if the repository is already downloaded
 if (!file.exists(zip_file)) {
@@ -74,34 +74,48 @@ if (!dir.exists(unzip_dir)) {
 # Load Data and Variable Table
 ################################################################################
 
-# Define the paths to the data folder within the unzipped repository
-data_folder <- file.path(unzip_dir, "data")  # Path to the "data" folder
-data_path <- file.path(data_folder, "data.csv")
-variable_table_path <- file.path(data_folder, "variable_table.csv")
+# Set up the file paths for the data files
+data_path <- file.path(unzip_dir, "data.csv")
+variable_table_path <- file.path(unzip_dir, "variable_table.csv")
 
-# Check if the "data" folder exists
-if (!dir.exists(data_folder)) {
-  stop("The 'data' folder is not found in the unzipped repository. 
+# Check if the files exist in the expected location
+if (!file.exists(data_path)) {
+  stop("The file 'data.csv' is not found in the unzipped repository folder. 
        Please check the repository structure.")
 }
 
-# Check if the required files exist in the "data" folder
-if (!file.exists(data_path)) {
-  stop("The file 'data.csv' is not found in the 'data' folder. 
-       Please ensure it exists in the repository structure.")
-}
-
 if (!file.exists(variable_table_path)) {
-  stop("The file 'variable_table.csv' is not found in the 'data' folder. 
-       Please ensure it exists in the repository structure.")
+  stop("The file 'variable_table.csv' is not found in the unzipped repository folder. 
+       Please check the repository structure.")
 }
 
 # Load the datasets
 data <- read.csv(data_path, header = TRUE, sep = ";")
 variable_table <- read_csv(variable_table_path)
 
-cat("Data and variable table loaded successfully from the 'data' folder.\n")
+cat("Data and variable table loaded successfully.\n")
 
+###########################Below works... but not for zip files#####
+
+# Set up the file paths for the data files
+data_path <- here("data", "data.csv")
+variable_table_path <- here("data", "variable_table.csv")
+
+# Check if the data file exists in the expected location
+if (!file.exists(data_path)) {
+  stop("The file 'data.csv' is not found in the 'data' folder. 
+       Please ensure the file is placed in the 'data' folder inside the 'predicting_ed_outcomes' repository.")
+}
+
+# Check if the variable table file exists in the expected location
+if (!file.exists(variable_table_path)) {
+  stop("The file 'variable_table.csv' is not found in the 'data' folder. 
+       Please ensure the file is placed in the 'data' folder inside the 'predicting_ed_outcomes' repository.")
+}
+
+# Load the datasets
+data <- read.csv(data_path, header = TRUE, sep = ";")
+variable_table <- read_csv(variable_table_path)
 
 ################################################################################
 # Clean the datasets
@@ -162,30 +176,30 @@ print(matching_variables)
 ################################################################################
 ## Set Variable Types
 
-# The next cleaning step is to set variable types. Luckily, the variable_table tells the author
+# The next cleaning step is to set variable types. Luckily, the variable_table tells us
 # how to code each variable type for analysis. The following code shows expected type (variable table) vs
 # the type currently in the data.
 
 # Extract the actual types from the data
-#data_types <- data.frame(
- # variable_name = colnames(data),   
-#  data_type = sapply(data, class), 
-#  stringsAsFactors = FALSE
-#)
+data_types <- data.frame(
+  variable_name = colnames(data),   
+  data_type = sapply(data, class), 
+  stringsAsFactors = FALSE
+)
 
 # Extract expected types from the variable_table
-#lookup_types <- variable_table %>%
-#  select(variable_name, expected_type = type)
+lookup_types <- variable_table %>%
+  select(variable_name, expected_type = type)
 
 # Join the actual types with the expected types
-#comparison <- data_types %>%
-#  left_join(lookup_types, by = "variable_name") 
+comparison <- data_types %>%
+  left_join(lookup_types, by = "variable_name") 
 
 # Display the comparison
-#cat("\nComparison of Actual and Expected Types:\n")
-#print(comparison)
+cat("\nComparison of Actual and Expected Types:\n")
+print(comparison)
 
-# Since R's equivalent of a "continuous" variable type is "numeric", the following changes are made:(or only 1 change is needed (target as factor)
+# Since R's equivalent of a "continuous" variable type is "numeric", the following changes are made:(or only 1 chang is needded (target as factor)
 # - `curricular_units_1st_sem_grade` is changed from numeric to integer.
 # - The `target` variable is replaced with numeric values for regression analysis.
 #data$curricular_units_1st_sem_grade <- as.integer(data$curricular_units_1st_sem_grade)`
@@ -205,18 +219,10 @@ sort(unique(data$target))
 
 
 ################################################################################
-## Split The Dataset and Justify The Decision
+## Split the dataset
 
 # Now before any analysis or exploration can be done, as best practice the dataset is split in order
-# to avoid over training. 
-
-# A quick inspection of the dataset shows a relatively small sample size for model training, and
-# a strong class imbalance:
-nrow(data)
-table(data$target)
-
-# Below an 80/20 split is used to maintain as much of the dataset for training as possible.
-# Once modeling begins, resampling techniques will be needed to address class imbalance.
+# to avoid over training.
 set.seed(123)  
 trainindex <- createDataPartition(data$target, p = .8, 
                                   list = FALSE, 
@@ -856,7 +862,7 @@ validate_features <- function(data) {
     feature_plots = feature_plots
   ))
 }
-# Apply the validation function
+# Apply the updated validation function
 validation_train_results <- validate_features(traindata)
 
 # Total NAs in the dataset
@@ -922,9 +928,6 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 ################################################################################
 ### Splitting 'traindata' for Model Training and Evaluation
 
-# As before, the dataset in split in 80% for training and 20% for training to preseve as much of the trainingset as possible,
-# while training 20% for validation.
-
 # Partition traindata
 set.seed(456)
 train_model_index <- createDataPartition(traindata$target, p = 0.8, list = FALSE)
@@ -968,7 +971,7 @@ print(dt_conf_matrix)
 
 ## Visualize the Decision Tree
 rpart.plot(decision_tree_model, type = 2, extra = 104)
-# As seen in the decision tree, the model used two key variables to make it's classifications: 
+# As seen in the decision tree, the model used two key variables to make it's classificaitons: 
 #- curricular_units_2nd_sem_approved
 #- tuition_fees_up_to_date.
 # These splits effectively separated dropouts (Class 1) and graduates (Class 3), 
@@ -976,9 +979,6 @@ rpart.plot(decision_tree_model, type = 2, extra = 104)
 # as evidenced by low proportions of Class 2 in terminal nodes. 
 # Unfortunately, this means the model decided the rest of the features were not helpful. 
 # This is called overfitting when the model assumes the other variables are just noise and not worth listening to.
-# Another key takeaway of this model, as seen in the decision tree, is that it tells counselors to focus on students who
-# are not approved for at least 4 credits in second semester, and who do not have their
-# tuition fees up to date as these students are most likely to be dropout. 
 
 
 ################################################################################
@@ -1184,4 +1184,3 @@ table(traindata$target)
 # Citations
 # Realinho, V., Vieira Martins, M., Machado, J., & Baptista, L. (2021). Predict Students' Dropout and Academic Success [Dataset]. UCI Machine Learning Repository. https://doi.org/10.24432/C5MC89.
 # U.S. Department of Education, National Center for Education Statistics, Integrated Postsecondary Education Data System (IPEDS), Winter 2020–21, Graduation Rates component. See Digest of Education Statistics 2021, table 326.20. Retreieved on 11/25/24 from https://nces.ed.gov/fastfacts/display.asp?id=40
-# US Department of Health and Human Services. (2023). Enrollment in higher education. Enrollment in Higher Education - Healthy People 2030. https://odphp.health.gov/healthypeople/priority-areas/social-determinants-health/literature-summaries/enrollment-higher-education 
