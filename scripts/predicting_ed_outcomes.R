@@ -6,9 +6,7 @@
 # to predict 3 levels of student outcomes: college graduation, dropout, or enrollment.
 
 # Requirements:
-# - Ensure necessary libraries are installed (see library loading section)(should be automated).
-# - If you've downloaded the entire repository then the code should run fine. 
-
+# - Downloaded the entire repository zip file from Github, then the code should run fine. 
 
 
 ################################################################################
@@ -28,10 +26,6 @@ for (pkg in packages) {
 # Load the libraries
 invisible(lapply(packages, library, character.only = TRUE))
 
-################################################################################
-# Download and unzip Repository
-################################################################################
-##########Test###########
 
 ################################################################################
 # Download and Unzip Repository
@@ -54,8 +48,9 @@ if (!dir.exists(unzip_dir)) {
   unzip(zip_file, exdir = here("data"))
 }
 
+
 ################################################################################
-# Load Data and Variable Table
+# Load Data and Variable Tables
 ################################################################################
 
 # Define the paths to the data folder within the unzipped repository
@@ -91,11 +86,10 @@ cat("Data and variable table loaded successfully from the 'data' folder.\n")
 # Clean the datasets
 ################################################################################
 
-# As seen below, the column names in data table and the variable and the variable_name column
-  #include spaces and parenthesis. All of which will cause issues with analysis later on.
+# As seen below, the column names in the datasets below include spaces and parenthesis. 
+# All of which will cause issues with analysis later on.
 cat("Column names in `data` before cleaning:\n")
 colnames(data)
-nrow(data)
 cat("\nColumn names in `variable_table` before cleaning:\n")
 colnames(variable_table)
 cat("\nVariable names in `variable_table` before cleaning:\n")
@@ -191,7 +185,7 @@ sort(unique(data$target))
 ################################################################################
 ## Split The Dataset and Justify The Decision
 
-# Now before any analysis or exploration can be done, as best practice the dataset is split in order
+# Now before any analysis or exploration can be done, as best practice, the dataset is split in order
 # to avoid over training. 
 
 # A quick inspection of the dataset shows a relatively small sample size for model training, and
@@ -208,24 +202,15 @@ trainindex <- createDataPartition(data$target, p = .8,
 traindata <- data[trainindex,]
 final_holdout_set  <- data[-trainindex,]
 
-
-# For sanity, below the number of nas in both the train and final_holdout set is counted.
-  # This is the only time the final_holdout_set is inspected before testing algorithms.
-
-# Count total NAs in traindata
-total_nas_traindata <- sum(is.na(traindata))
-cat("Total NAs in traindata:", total_nas_traindata, "\n")
-
-# Count total NAs in testdata
-total_nas_final_holdout_set <- sum(is.na(final_holdout_set))
-cat("Total NAs in final_holdout_set data:", total_nas_final_holdout_set, "\n")
+# With the split complete, final_holdout_set will not be explored or used in anyway until
+# testing the developed models
 
 
 ################################################################################
 # Exploratory Data Analysis
 ################################################################################
 # Now that the data has been cleaned, some exploration can be done to better understand
-# the students in the traindata by inspecting the variables that describe them. 
+# the students in traindata by inspecting the variables that describe them. 
 # Any findings can contribute to the modeling done later.
 
 # See number of students in dataset
@@ -236,19 +221,21 @@ table(traindata$target)
 head(traindata)
 
 # The code above shows the data contains 3540 students, 36 variables to help predict target (37th),
-#3 levels of outcomes to predict, 1137 have dropped out, 636 are currently enrolled, and 1768 have graduated.
-# The relatively small number of currently enrolled students will likely lead to difficulty in modeling due to class imbalance
-# Lastly, all values are coded with numbers. In order to have a functional and targeted exploration, the following section 
-# performs a linear regression to get an idea of what variables are predictive of dropout, enrolled, and graduated. Afterwards, these predictive variables
-# will be explored more thoroughly.
+# 3 levels of outcomes to predict 1137 have dropout, 636 enrolled, and 1768 graduated students.
+# The relatively small number of currently enrolled students will likely lead to difficulty 
+# in modeling due to class imbalance.
+# Lastly, all values are coded with numbers. In order to have a functional and targeted exploration, 
+# the following section performs a linear regression to get an idea of what variables are predictive of 
+# dropout, enrolled, and graduated. Afterwards, these predictive variables will be explored more thoroughly.
 
 
 ################################################################################
-## Linear Regression 
-## To better understand the predictive variables in the dataset, this regression will visualize
-  # how certain variables might be predictive of target as a whole.
+# Linear Regression 
 
-# Extract variable names for the formula
+# To better understand the predictive variables in the dataset, the following regression will visualize
+# how certain variables might be predictive of target as a whole.
+
+# Extract variable names for a formula
 variables_train <- colnames(traindata)
 
 # Remove the 'target' variable from the list of predictors
@@ -266,9 +253,7 @@ value1 <- lm(formula_train, data = traindata)
 # Visualize the coefficients
 regression_plot<-coefplot(value1, sort = 'magnitude', conf.int = TRUE)
 regression_plot
-# The coefficient plot above provides insights into the variables' relationships 
-# with the target outcome and their relative strengths. It highlights variables 
-# with significant predictive power, as well as those with wide error margins 
+# The plot highlights variables with significant predictive power, as well as those with wide error margins 
 # crossing zero, suggesting limited or no effect.
 
 # Key Findings:
@@ -310,8 +295,8 @@ continuous_vars <- c("admission_grade", "curricular_units_1st_sem_grade", "gdp")
 
 # Print Binary variable definitions
 variable_table %>%
-  slice(c(14:19, 21)) %>%  # Select rows 14 to 19 and 21
-  select(variable_name, description) %>%  # Select specific columns
+  slice(c(14:19, 21)) %>%  
+  select(variable_name, description) %>%  
   print()
 # 1 = yes & 0 = no for binary values
 
@@ -320,7 +305,8 @@ binary_data <- traindata %>%
   select(all_of(binary_vars)) %>%
   pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value") %>%
   count(Variable, Value)
-# Map human-readable names for binary variable values
+
+# Map readable names for binary variable values
 value_labels <- c("0" = "No/Not Applicable/Male", "1" = "Yes/Applicable/Female")
 ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
   geom_bar(stat = "identity", position = "dodge", color = "black") +
@@ -345,10 +331,14 @@ ggplot(binary_data, aes(x = Variable, y = n, fill = as.factor(Value))) +
     axis.text.x = element_text(angle = 45, hjust = 1),
     plot.title = element_text(hjust = 0.5)
   )
+
 # The chart above shows that the vast majority of students are not debtor (don't owe money to school), 
-# nor special needs, most are male, aren't international, or scholarship holders.
-# This finding warrants more digging, since the regression above found all but gender to be predictive of our target variable.
-# Below, the chart compares the same variables against the 3 levels of target ( 0 = dropout, 1 = enrolled, 2 = graduated)
+# nor special needs. Most are male, aren't international, or scholarship holders.
+# This finding warrants more digging, since the regression above found all but gender to be predictive of 
+# the target variable. 
+
+# Below, the chart compares the same variables against the 3 levels of target 
+# ( 1 = dropout, 2 = enrolled, 3 = graduated)
 binary_target_table <- traindata %>%
   select(all_of(binary_vars), target) %>%
   pivot_longer(cols = -target, names_to = "Variable", values_to = "Value") %>%
@@ -356,23 +346,22 @@ binary_target_table <- traindata %>%
   pivot_wider(
     names_from = target,
     values_from = n,
-    values_fill = 0, # Fill missing combinations with 0
+    values_fill = 0, 
     names_prefix = "Target_"
   )
 print(binary_target_table)
 # The chart above reflects the regression above that these variables do have a high number of 
-# of graduated students, which is typical with the National Center for Education Statistics reporting average 6year gradaution of college
-# at 64% in 2020.
+# graduated students, which is typical with the National Center for Education Statistics 
+# reporting average 6 year graduation of college at 64% in 2020.
 
 # A few powerful takeaways include: 
-#- A significant number of students who dropped out (312) were debtors compared to those who graduated (101) or are still enrolled (90).
-#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374). 
+#- A significant number of students who dropped out (312) were debtors compared to 
+  # those who graduated (101) or are still enrolled (90).
+#- A similar number of students without scholarships dropped out (1287) as those who graduated (1374).
+  # suggesting a. less clear relationship for predicting dropout.
 
-#Below, one can see the rate of scholarship holders dropping out (12%)
-  # is much lower than that of non_scholarship holders (38%). 
 
-
-### Scholarship Comparison to Dropout
+# Scholarship Comparison to Dropout
 # Compare scholarship holder drop out vs non_scholarship holder dropout
 scholarship_holder_rate <- binary_target_table %>%
   filter(Variable == "scholarship_holder", Value == 1) %>%
@@ -391,14 +380,12 @@ non_scholarship_holder_rate <- binary_target_table %>%
     non_scholarship_dropout_rate = total_non_scholarship_dropouts / total_non_scholarship_students
   )
 non_scholarship_holder_rate
+# The plot generated above shows the rate of scholarship holders dropping out (12%)
+# is much lower than that of non_scholarship holders (38%).
 # This finding suggests financial support is a strong incentive to not dropout.
 
 
 ### Gender Comparison to Dropout
-  #Although there are significantly more men (2278) than women (1262), in the dataset, they have roughly the same number of drop outs (men = 556 & women = 569).
-  # As a result, the rate of female_drop out is very high 45% for women vs 24% for men.
-  # This could be sampling error and possibly unique to the dataset which is taken from the following diverse degree programs:
-  #"agronomy, design, education, nursing, journalism, management, social service, and technologies" (Martins et al., 2021).
 gender_male_rate <- binary_target_table %>%
   filter(Variable == "gender", Value == 0) %>%
   summarize(
@@ -416,9 +403,16 @@ gender_female_rate <- binary_target_table %>%
     female_dropout_rate = total_female_dropouts / total_female_students
   )
 gender_female_rate
+# The 2 tables above show significantly more men (2278) than women (1262) in the dataset, and 
+# despite thus difference roughly the same number of drop outs (men = 556 & women = 569).
+# As a result, the rate of female_drop out is very high 45% for women vs 24% for men.
+# This could be sampling error and possibly unique to the dataset which is taken from the 
+# following diverse degree programs:
+#"agronomy, design, education, nursing, journalism, management, social service, 
+# and technologies" (Martins et al., 2021).
 
-# Almost all of students who owe tuition fees (87%) dropout. Shedding light again on the importance of financial support and reflecting 
-  # the finding in the regression chart as the most predictive with a correlation coefficient of .5
+
+### Owe Fees
 owe_fees_drop_rate <- binary_target_table %>%
   filter(Variable == "tuition_fees_up_to_date", Value == 0) %>%
   summarize(
@@ -427,10 +421,12 @@ owe_fees_drop_rate <- binary_target_table %>%
     owe_fee_dropout_rate = total_owe_fee_dropouts / total_owe_fee_students
   )
 owe_fees_drop_rate
+# Almost all of students who owe tuition fees (87%) dropout. 
+# Shedding light again on the importance of financial support and reflecting 
+# the finding in the regression chart as the most predictive with a correlation coefficient of .5
+
 
 ### International Students & Dropout
-# International students have a drop out rate of 30%, which is similar to the total dropout rate of teh data set ~32%.
-# this is interesting when internation status was the second most predictive variable after tuition and fees up to date.
 international_rate <- binary_target_table %>%
   filter(Variable == "international", Value == 1) %>%
   summarize(
@@ -447,11 +443,13 @@ overall_dropout_rate <- traindata %>%
     dropout_rate = total_dropouts / total_students
   )
 overall_dropout_rate
+# International students have a drop out rate of 30%, which is similar to the total dropout rate of 
+# the data set as a whole ~32%.
+# This is interesting when international status was the second most predictive variable 
+# after tuition and fees up to date.
+
 
 ### Students with Special Needs & Dropout
-# Although there were not many students with special needs in the dataset, the 
-# the perseverence of these students, and possibly their support is clear when the dropout rate of 35% is not much
-# high than that of the dataset as a whole (~32%)
 educational_special_needs_rate <- binary_target_table %>%
   filter(Variable == "educational_special_needs", Value == 1) %>%
   summarize(
@@ -460,6 +458,9 @@ educational_special_needs_rate <- binary_target_table %>%
     special_needs_dropout_rate = total_special_needs_dropouts / total_special_needs_students
   )
 educational_special_needs_rate
+# Although there were not many students with special needs in the dataset, the 
+# perseverance of these students, and possibly their support is clear when the dropout rate of 35% 
+# is not much higher than that of the dataset as a whole (~32%)
 
 
 ###############################################################################
@@ -495,14 +496,15 @@ semester_summary <- traindata %>%
     .groups = "drop"
   )
 print(semester_summary)
-# The summary above shows teh following
-# On average students aer approved for 4.7 to 4.4 units each semester, but enroll 6.25 to 6.22, and are only credited .6 to .5 in the first and second semester, respectively.
-  # this finding suggests many students are not succeeding in passing their course.
-# Which is futher eemplified in an average greade of 10.3/20 in sem 1 and sem2. which is only .3 on average above the minimum passing grade.
-# most course offer atleast a few evalauations (evident by .14 -.15 avg units without an eval each semesters)
+# The summary above shows teh following:
+# On average students aer approved for 4.7 to 4.4 units each semester, but enroll 6.25 to 6.22, 
+# and are only credited .6 to .5 in the first and second semester, respectively.
+# This finding suggests many students are not succeeding in passing their courses.
+# Which is further eexmplified in an average grade of 10.3/20 in semester 1 and semester 2. 
+# Notably, that is only .3, on average, above the minimum passing grade.
+# Most course offer at least a few evalauations (evident by .14 -.15 avg units without an eval each semesters)
 
 # The following code visualizes the distribution of each of these variables.
-# Boxplot of variables grouped by semester
 units_distributed<- traindata %>%
   select(all_of(semester_variables$variable_name)) %>%
   pivot_longer(everything(), names_to = "variable_name", values_to = "value") %>%
@@ -518,18 +520,20 @@ units_distributed<- traindata %>%
   ) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 units_distributed
-# most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
-# who are no longer earning credits, but also telling of students who might have dropped out, more than students enrolled (which is the smallest group)
-# without more context into what units credited means, it's hard to draw conclusions.
-
-# Again, average grades are only just above 10/20 in semester 1, with some more variablility in semester 2, but a similar average.
+# Most clearly, students on average are earning 0 credits, which may be more descriptive of graduates
+# who are no longer earning credits, but also telling of students who might have dropped out.
+# without more context into what units credited means, 
+# it's hard to draw conclusions about why so few are credited.
+# Again, average grades are only just above 10/20 in semester 1, 
+# with some more variablility in semester 2, but a similar average.
 
 
 ################################################################################
-# Categorical variables, specifically nationality[8], Previous education, previous education grade, degree programs, and courses
+# Categorical variables, specifically nationality, Previous education, 
+# previous education grade, degree programs, and courses
 
 ### Nationality
-# Summarize nationality distribution in the dataset
+# Summarize nationality distribution
 nationality_summary <- traindata %>%
   group_by(nacionality) %>%
   summarize(
@@ -546,11 +550,12 @@ variable_description <- variable_table %>%
   mutate(description = str_wrap(description, width = 80)) 
 description_text <- variable_description$description
 cat(description_text)
-# Above shows over 97% of the dataset is Portuguese. An appropriate finding for a Portugal based university.
+# Above shows over 97% of the dataset is Portuguese. 
+# An appropriate finding for a Portugal based university.
 
 
 ### Previous Educational Achievement
-# Summarize previous_qualification (index 6)
+# Summarize previous_qualification (row 6)
 previous_education_summary <- traindata %>%
   group_by(previous_qualification) %>%
   summarize(
@@ -560,7 +565,7 @@ previous_education_summary <- traindata %>%
   arrange(desc(Count))
 print(previous_education_summary)
 
-# Pull description for nationality (row 6) in the variable table
+# Pull description for previous qualification (row 6) in the variable table
 variable_description <- variable_table %>%
   slice(6) %>% 
   select(variable_name, description) %>%
@@ -571,6 +576,9 @@ cat(description_text)
 # suggesting the sample describes largely Freshman and Sophomore students who had not had other more recent achievements, like the 5% with Technological specialization course (39).
 # notably,~4%, the third largest group, is coming with 9,10,11th grade completed, but not a secondary level degree. Suggesting these students are taking 
 # college credits. This group may perform better or worse than others and could be a useful feature. Below confirms the age of the sample is aligns with first and second year univeristy students:
+
+
+### Age at Enrollment
 # Summarize age_at_enrollment
 age_summary <- traindata %>%
   group_by(age_at_enrollment) %>%
@@ -581,6 +589,7 @@ age_summary <- traindata %>%
   arrange(desc(Percentage))
 print(age_summary)
 # about half the sample is 18 or 19, with 80% falling between 18 and 27.
+
 
 ### Previous Education Grade
 # Summarize previous_qualification_grade (index 7)
@@ -593,6 +602,7 @@ grade_summary <- traindata %>%
     SD_Grade = sd(previous_qualification_grade, na.rm = TRUE)
   )
 print(grade_summary)
+
 # Pull description for previous education grade (row 7) in the variable table
 variable_description <- variable_table %>%
   slice(7) %>% 
@@ -602,9 +612,8 @@ description_text <- variable_description$description
 cat(description_text)
 # The average grade coming into university was about 133/200, with a standard deviation of 13.
 
+
 ### Courses
-# Investigating the distribution of courses [row 4] taken in the sample will contribute to understanding the study and where possible student
-# support is need
 # Summarize the course variable
 course_summary <- traindata %>%
   group_by(course) %>%
@@ -627,22 +636,26 @@ variable_description <- variable_table %>%
 description_text <- variable_description$description
 cat(description_text)
 # Above shows that out of 17 courses and 3540 students, the majority (17%) are in the nursing program
-# 8.5% in Management, 8% in social services, and ~8%  in both veterinary nursing and Journalism and communication.
-# The rst of the course have 6% - .2% each. These results suggest a good distribution across fields of study.
+# 8.5% in Management, 8% in social services, and ~8%  in both veterinary nursing, Journalism, and communication.
+# The rest of the courses have 6% - .2% each. 
+# These results suggest a good distribution across fields of study.
 
 
 ################################################################################
 ### Exploratory Data Analysis Summary:
 
 # - Examined binary variables (e.g., debtor status, scholarship holder, gender) and their distributions.
-# - Identified that scholarship holders have a significantly lower dropout rate (12%) compared to non-scholarship holders (38%).
-# - Noted that international students have a dropout rate similar to the overall rate (~30%), despite being a predictive variable.
-# - Analyzed semester-wise academic performance, observing that dropouts have lower average grades compared to graduates.
+# - Identified that scholarship holders have a significantly lower dropout rate (12%) 
+  # compared to non-scholarship holders (38%).
+# - Noted that international students have a dropout rate similar to the overall rate (~30%), 
+  # despite being a predictive variable.
+# - Analyzed semester-wise academic performance, observing that dropouts have lower average grades 
+  # compared to graduates.
 # - Visualized data using bar charts and boxplots to highlight key differences across groups.
 
 # Based on the insights from the exploratory analysis, the next section engineers new features.
-# These features will capture important factors such as financial status, academic performance, and course difficulty,
-# enhancing the predictive power of the models to be built.
+# These features will capture important factors such as financial status, academic performance, 
+# and course difficulty, enhancing the predictive power of the models to be built.
 
 
 ################################################################################
@@ -651,7 +664,7 @@ cat(description_text)
 
 # Feature development is the practice of getting the most out of a dataset by introducing new
 # variables. The feature engineering function below creates 26 new features in 10 categories. 
-# The description of each category of features is found at the end of each chunk of code.
+# The description and logic of each category of features is found below at the end of each chunk of code.
 
 feature_engineering <- function(data) {
   
@@ -773,7 +786,7 @@ traindata <- feature_engineering(traindata)
 # The following code prints the new size of the datasets:
 ncol(traindata)
 colnames(traindata)
-
+# There are now 62 features and 1 predictor in the trainset.
 
 # The following function does 4 key things to evaluate the newly engineered features:
 #- 1. Count total NAs in the dataset
@@ -848,7 +861,10 @@ cat("Total NA Count:", validation_train_results$total_na, "\n")
 
 # NA counts per feature
 print(validation_train_results$na_counts)
-# The dataset only has 2 NAs. These two instances can be removed for simplicity.
+# The dataset only has 2 NAs. These two instances are removed below for simplicity.
+traindata <- traindata %>% drop_na()
+# Validate the dataset no longer contain NAs
+cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), "\n")
 
 # Features with 100% 0s or 1s
 if (nrow(validation_train_results$constant_features) > 0) {
@@ -863,23 +879,33 @@ if (nrow(validation_train_results$constant_features) > 0) {
 for (feature_name in names(validation_train_results$feature_plots)) {
   print(validation_train_results$feature_plots[[feature_name]])
 }
-# Distribution of Semester gap: shows most students have no little difference in grades with a normal distribution around 0
-  # with some outliars at -10 and + 10, which may point to dropouts or students who return from a break.
-# Distribution of Average grade: shows largest cluster between 10/20 and 15/20, with a very large concentration at 0, and a smaller concentration between 5 and 10
-  # suggesting some students are in trouble of failing or simply not taking courses.
-# Distribution of weak historical success shows majority of students performed well in past, but about 500 did not
-# Discouraging courses show about 100 students have taken classes that led to them receiving a failing grade (below 10).
-# Strangely, most students fall into the category of being under enrolled in both semesters (less than 10 credits). 
-  # This may be due to missing domain knowledge on part of the author.
-# Distribution of failing first semester shows about 500 students are getting grades below 10/20.
-# Owe money distribution is not capturing many students, but since tuition fees up to date was most predictive of target
-# in the regression before, it will be retained.
+################################################################################
+# Summary of Plots and Feature Validation
 
-# With the feature development successful at generating new features, a final step includes
-# removing the 2 NAS that were generated"
-traindata <- traindata %>% drop_na()
-# Validate the dataset no longer contain NAs
-cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), "\n")
+# Distribution of Semester gap: 
+  #shows most students have no little difference in grades with a normal distribution around 0
+  # with some outliars at -10 and + 10, which may point to dropouts or students who return from a break.
+
+# Distribution of Average grade: 
+  # shows largest cluster between 10/20 and 15/20, with a very large concentration at 0, and a smaller concentration between 5 and 10
+  # suggesting some students are in trouble of failing or simply not taking courses.
+
+# Distribution of weak historical success:
+  # shows majority of students performed well in past, but about 500 did not.
+
+# Distribution of Discouraging courses:
+  # show about 100 students have taken classes that led to them receiving a failing grade (below 10).
+# Distribution of Under Enrolled in Both Semesters
+  # Strangely, most students fall into the category of being under enrolled in both semesters 
+  # (less than 10 credits). This may be due to missing domain knowledge on part of the author.
+
+# Distribution of failing first semester:
+  # shows about 500 students are getting grades below 10/20.
+
+# Owe money distribution: 
+  # is not capturing many students, but since tuition fees up to date was most predictive of target
+  # in the regression before, this feature will be retained.
+
 
 # This feature validation section shows that the number of features has been nearly doubled. This could
 # increase predictive power, but could also increase the likelihood of over-fitting. To avoid over fitting
@@ -889,11 +915,11 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 ################################################################################
 ## Choosing Classification 
 ################################################################################
-# This section justifies classification as the task for predicting student outcoems.
+# This section justifies classification as the task for predicting student outcomes.
 
 # Now that the dataset has been loaded, cleaned, and split into training and test sets, 
-# followed by exploratory analysis and the development of features to maximize the information within the dataset, 
-# it’s time to start modeling an algorithm to predict college outcomes. 
+# followed by exploratory analysis and the development of features to maximize the 
+# information within the dataset, it’s time to start modeling an algorithm to predict college outcomes. 
 # The developed features have been validated and applied consistently to both the training and test sets.
 
 # Since the college outcomes in this dataset are categorized into three distinct groups—dropout, 
@@ -906,8 +932,8 @@ cat("Total NA Count in Training Dataset after removal:", sum(is.na(traindata)), 
 ################################################################################
 ### Splitting 'traindata' for Model Training and Evaluation
 
-# As before, the dataset in split in 80% for training and 20% for training to preseve as much of the trainingset as possible,
-# while training 20% for validation.
+# As before, the dataset in split in 80% for training and 20% for training to 
+# preseve as much of the trainingset as possible, while training 20% for validation.
 
 # Partition traindata
 set.seed(456)
@@ -924,7 +950,7 @@ validation_set$target <- as.factor(validation_set$target)
 ################################################################################
 ## Model #1 Decision Tree Classification
 ################################################################################
-### Train the Decision Tree Model
+### Train a Decision Tree Model
 
 # Training
 decision_tree_model <- rpart(
@@ -946,7 +972,8 @@ print(dt_conf_matrix)
   
 #However, there are notable challenges:
   #- The model entirely fails to predict the "enrolled" class (Sensitivity = 0, Precision = NaN). 
-  #This suggests a lack of information or patterns in the data for this group or is the impact of class imbalance (as seen below)
+    #This suggests a lack of information or patterns in the data for this group or is the impact of 
+    # class imbalance (as seen below)
   #- A concerning misclassification occurs where **43 students who dropped out were classified as graduates. 
   #This is problematic because misclassifying a dropout as a graduate could lead to overlooking at-risk students needing intervention.
 
@@ -960,9 +987,10 @@ rpart.plot(decision_tree_model, type = 2, extra = 104)
 # as evidenced by low proportions of Class 2 in terminal nodes. 
 # Unfortunately, this means the model decided the rest of the features were not helpful. 
 # This is called overfitting when the model assumes the other variables are just noise and not worth listening to.
-# Another key takeaway of this model, as seen in the decision tree, is that it tells counselors to focus on students who
-# are not approved for at least 4 credits in second semester, and who do not have their
-# tuition fees up to date as these students are most likely to be dropout. 
+# Another key takeaway of this model, as seen in the decision tree, 
+# is that it tells counselors to focus on students who are not approved for at least 4 credits 
+# in second semester, and who do not have their tuition fees up to date as these students 
+# are most likely to be dropout. 
 
 
 ################################################################################
