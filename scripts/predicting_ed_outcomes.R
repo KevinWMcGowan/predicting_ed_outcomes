@@ -987,9 +987,9 @@ rpart.plot(decision_tree_model, type = 2, extra = 104)
 # as evidenced by low proportions of Class 2 in terminal nodes. 
 # Unfortunately, this means the model decided the rest of the features were not helpful. 
 # This is called overfitting when the model assumes the other variables are just noise and not worth listening to.
-# Another key takeaway of this model, as seen in the decision tree, 
-# is that it tells counselors to focus on students who are not approved for at least 4 credits 
-# in second semester, and who do not have their tuition fees up to date as these students 
+# Thanks to the decision tree plot, counselors arenow shown what two variables
+# are most important to focus: students who are not approved for at least 4 credits 
+# in second semester; and who do not have their tuition fees up to date as these students 
 # are most likely to be dropout. 
 
 
@@ -998,24 +998,24 @@ rpart.plot(decision_tree_model, type = 2, extra = 104)
 ################################################################################
 # In order to account for the class imbalance, boosted trees increase the number of 
 # iterations and samplings for enrolled AKA Target =2. Additionally, to account for the many features,
-# this model uses cross validation as the method.
+# this model uses cross validation.
 
-## Define training control for cross-validation
+# Define training control for cross-validation
 train_control_gbt <- trainControl(
   method = "cv",          # k-fold cross-validation
   number = 5,             # folds
   verboseIter = TRUE
 )
 
-## Define the grid of hyperparameters to tune
+# Define the grid of hyperparameters to tune
 gbt_grid <- expand.grid(
   n.trees = seq(100, 700, by = 100),  # Number of boosting iterations
-  interaction.depth = c(1, 2, 3),     # Max depth of each tree
+  interaction.depth = c(1, 2, 3),     # depth of each tree
   shrinkage = c(0.05, 0.075, 0.1),    # Learning rate
   n.minobsinnode = c(5, 10)           # Minimum number of observations in a node
 )
 
-## Train the Gradient Boosted Trees model (This will take a few minutes)
+# Train the Gradient Boosted Trees model (This will take a few minutes)
 set.seed(123)
 gbt_model <- train(
   target ~ ., 
@@ -1026,14 +1026,13 @@ gbt_model <- train(
   verbose = FALSE
 )
 # Thanks to cross validations 5 folds, the model is trained on 4 folds and validated on the 5th.
-# This ensures that all data is used for both training and validation.
 # Boosting reweights categories that are misclassified within the folds to handle class imbalance (e.g., Target = 2)
 
 # Print the best model parameters from cross-validation
 cat("Best Model Parameters from Cross-Validation:\n")
 print(gbt_model$bestTune)
 
-## Predict on the validation set
+# Predict on the validation set
 gbt_predictions <- predict(gbt_model, validation_set)
 
 ## Evaluate the model
@@ -1049,11 +1048,11 @@ print(gbt_conf_matrix)
 
 # Enrolled (Class 2)
 # For the enrolled class, sensitivity improves to 41.60% compared to 0% in the Decision Tree model.
-# While this is an improvement, it still reflects challenges in accurately identifying enrolled students.
-# Specificity remains high at 92.44%, indicating the model's ability to correctly exclude non-enrolled students.
-# Precision (Positive Predictive Value) for this class is 54.17%, showing moderate reliability 
-# in enrolled predictions. The results suggest the GBT model partially addresses class imbalance, 
-# though further improvements are needed for this minority class.
+# While this is a substantial improvement, it still reflects challenges in accurately identifying 
+# enrolled students. Specificity remains high at 92.44%, indicating the model's ability to 
+# 3 correctly exclude non-enrolled students. Precision (Positive Predictive Value) for this class is 54.17%, 
+# showing moderate reliability in enrolled predictions. The results suggest the GBT model partially 
+# addresses class imbalance, though further improvements are needed for this minority class.
 
 # Graduate (Class 3)
 # The GBT model shows strong sensitivity for graduates at 92.07%, effectively identifying students likely to graduate.
@@ -1061,11 +1060,11 @@ print(gbt_conf_matrix)
 # These results maintain strong performance for the graduate class, with slight improvements in specificity 
 # over the Decision Tree model, albeit with a small trade-off in sensitivity.
 
-# Visualize the performance of the Gradient Boosted Trees model
+# Visualize the performance of the Gradient Boosted Trees model with CV
 plot(gbt_model)
 # The plot shows that boosting iterations (x-axis) did greatly impact accuracy (as seen on y axis)
-# fora ll three outcomes (dropout=1, enrolled =2, graduated =3).
-# Cross validation automatically picked the best tune that optimizes for the best outcoems across all 2.
+# forall three outcomes (dropout=1, enrolled =2, graduated =3).
+# Cross validation automatically picked the best tune that optimizes for the best outcomes across all 2.
 # The chart shows that the three values align best around 200 trees, a depth of 3, shrinkage of .05
 # and 10 observations per node.
 
@@ -1073,18 +1072,14 @@ plot(gbt_model)
 # particularly in its ability to predict the enrolled class. 
 
 
-
 ################################################################################
 # Results
 ################################################################################
-colnames(final_holdout_set)
 
-# Results Section
-
-# With two models developed and tested on the training sets' validation_set,
+# With two models developed with traindata and tested on the training sets' validation_set,
 # it's now time to test each model on the final_holdout_set
 
-# Step 1: Set Target as factor (consider moving above of feature engineering)
+# Step 1: Set Target as factor 
 # Ensure the target variable in the final_holdout_set is a factor
 final_holdout_set$target <- as.factor(final_holdout_set$target)
 
@@ -1114,8 +1109,9 @@ gbt_holdout_predictions <- predict(gbt_model, final_holdout_set)
 gbt_holdout_conf_matrix <- confusionMatrix(gbt_holdout_predictions, final_holdout_set$target)
 cat("Gradient Boosted Trees Results on Final Holdout Set:\n")
 print(gbt_holdout_conf_matrix)
-# The results above show, in terms of balanced accuracy, the boosted tree model was able to maintain similar performance to the DT model
-# in predicting dropout (GBT = .81 vs DT = .81) and enrolled (GBT = .85 vs DT = .80)  while making up 15% in enrolled (GBT = .65 vs DT = .50).
+# The results above show, in terms of balanced accuracy, the boosted tree model 
+# was able to maintain similar performance to the DT model in predicting dropout (GBT = .81 vs DT = .81) 
+# and enrolled (GBT = .85 vs DT = .80)  while making up 15% in enrolled (GBT = .65 vs DT = .50).
 # This difference is certainly attributed to cross validations and the boosted resampling. 
 
 
@@ -1144,65 +1140,39 @@ plot_confusion_matrix <- function(conf_matrix, model_name) {
 # Visualize Decision Tree Model
 dt_conf_matrix_plot <- plot_confusion_matrix(dt_holdout_conf_matrix, "Decision Tree")
 print(dt_conf_matrix_plot)
-# Represented by the darker colors in the top right and bottom left, the model greatly favored enrollment and dropout, and completely missed enrolled.
-  # This performance was expected and negligably different from the DT performance on the validation set:
-    #- validation set results =  balanced accuracy of  0.8423   0.5000   0.8008 in Dropout, enrolled, and graduate, respectively.
-    # Final_holdout_set results = 0.8133    0.500   0.8011 
+# Represented by the darker colors in the top right and bottom left, the model greatly favored 
+# enrollment and dropout, and completely missed enrolled.
+# This performance was expected and negligibly different from the DT performance on the validation set:
+#- validation set results =  balanced accuracy of  0.8423, 0.5000, 0.8008 in Dropout, enrolled, and graduate, respectively.
+    # Final_holdout_set results = 0.8133, 0.500, 0.8011 
 
 # Visualize Gradient Boosted Trees Model
 gbt_conf_matrix_plot <- plot_confusion_matrix(gbt_holdout_conf_matrix, "GBT")
 print(gbt_conf_matrix_plot)
 # The GBT heat map shows slightly lower correct predictions for enrolled and dropout compared to DT, 
-  # but actually made predictions for enrolled, making it the stronger of the two models.
+  # but actually made predictions for enrolled, making it the stronger of the two models. 
+#- validation set results = balanced accuracy of 0.8390  0.67020   0.8530
+    # Final Holdout_set results = balanced accuracy of 0.8149, 0.65228, 0.8477 in dropout, enrolled, and graduated, respectively.
 
 
 ################################################################################
 # Conclusion
 ################################################################################
-# Sumamary
+# Summary
 
-# In conclusion, this report has cleaned the dataset, explored the variables, built new features, and developed two mmachine learning models
-# to predict student outcomes at university (dropout, enrolled, graduate). The two models developed were decision trees & gradiaent boosted trees.
-# The performance of these two models are mediocre at best. Due to class imbalance, precision/pos predictive value is one of the best measures of success. 
-# As shown above, GBT performs much better than decision trees in this regaard (DT = 0.7267      NaN   0.7329) vs (GPT = 0.7695  0.50000   0.8148).
-# This difference is largely due to cross validation and the use of boosted sampling for mis-classified target in it's training. 
-# However, with GBT only identified 38% of enrolled students (sensitivity), as a result, the model is left wanting. 
-# On the positive side, enrolled is the least important group for prediction since it is the most easily identified in the present. Notably, 
-# accurately predicting 74% of dropouts and 90% (sensitivity) of graduates are strong outcomes and suggests that with further refinement
-# as discussed in the following section greater outcomes can be achieved.
-
-## Limitations
- # This data doesn't include year over year data resulting in limited conclusion ability based
-  # on annual distribution of enrolled, graduate, and drop out.
-  # don't know the university? maybe we do? If we don't then we don't know what financial support looks like (maybe future direction)
-  # Don't know for certain without further digging which courses belong to which degree program. Making this connection would contribute to knowing the unique suport needs of each degree path.
-  # There are too many features and not enough data. 
-ncol(traindata)
-nrow(traindata)
-table(traindata$target)
-# With 62 features interacting to predict educational outcomes on a training dataset with 3539 students, 
-# only 647 currently enrolled, vs 1124 dropout and 1768 graduate both models were over-fitting due to this low prevelance.
-
-# Most students on average were earning 0 credits, which may reflect graduates who are no longer earning credits or students who have dropped out. 
-# This pattern may not accurately represent currently enrolled students, who are the smallest group. Without more context about what "units credited" means, 
-# it is difficult to draw clear conclusions.
-
-## Future Directions
-  # There were many variables that were not further explored because their predictability in their current form wasn't strong enough to warrant immediate exploration and feature development.
-  # For instance, all the variables that fell along 0 in the regression plot below were largely left alone, leading to opportunity to develop new feature not yet explored.
-  # Specially, creating demographic features that describe parent occupation and previous education achievement (qualification) could increase or decrease likelihood of success in University.
-
-  # In order to address class imbalance, additional strategies can be employed like SMOTE or weighted loss functions) could further improve performance on the minority class.
-  # Neither model explicitly used techniques like oversampling, undersampling, or class-weighted learning to fully address class imbalance (is this statement true of the gradient boosted method employed above?)
-  # Additionally, research should test an elastic net model or lasso to more strategically select which features to include. Another future direction is 
-  # to add 
-
-  # it would be interesting to change this to a 2 classification problem only seeking the end of college outcome of 
-  # of graduate or dropout. 
-
-  # Lastly, a probabilistic approach like multinomial linear regression would be a logical next step to inform
-  # counselors and stakeholders of the probability each student has of falling into the dropout category.
-  # This would give counselors information they could act on.
+# In conclusion, this report has cleaned the dataset, explored the variables, built new features, 
+# and developed two machine learning models to predict student outcomes at university (dropout, 
+# enrolled, graduate). The two models developed were decision trees & gradient boosted trees.
+# The performance of these two models are mediocre at best. Due to class imbalance, 
+# precision/pos predictive value is one of the best measures of success. As shown above, 
+# GBT performs much better than decision trees in this regard (DT = 0.7267,  NaN, 0.7329) vs 
+# (GPT = 0.7695  0.50000   0.8148). This difference is largely due to cross validation 
+# and the use of boosted sampling for mis-classified target in it's training. 
+# However, GBT only identified 38% of enrolled students (sensitivity), as a result, the model is left wanting. 
+# On the positive side, enrolled is the least important group for prediction since it is the most easily 
+# identified by counselors. Notably, accurately predicting 74% of dropouts and 90% (sensitivity) 
+# of graduates are strong outcomes and suggests that with further refinement, as discussed 
+# in the following section, greater outcomes can be achieved.
 
 
 ################################################################################
