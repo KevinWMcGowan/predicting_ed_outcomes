@@ -824,8 +824,7 @@ validate_features <- function(data) {
   # 4. Visualize Key Features
   key_features <- c(
     "owe_money", 
-    "failing_first_sem", 
-    "under_enrolled_2nd_sem", "under_enrolled_both_sem", 
+    "failing_first_sem", "under_enrolled_both_sem", 
     "discouraging_courses", "weak_historical_success", 
     "average_grade", "semester_grade_gap"
   )
@@ -895,6 +894,7 @@ for (feature_name in names(validation_train_results$feature_plots)) {
 
 # Distribution of Discouraging courses:
   # show about 100 students have taken classes that led to them receiving a failing grade (below 10).
+
 # Distribution of Under Enrolled in Both Semesters
   # Strangely, most students fall into the category of being under enrolled in both semesters 
   # (less than 10 credits). This may be due to missing domain knowledge on part of the author.
@@ -1154,7 +1154,7 @@ print(gbt_conf_matrix_plot)
 #- validation set results = balanced accuracy of 0.8390  0.67020   0.8530
     # Final Holdout_set results = balanced accuracy of 0.8149, 0.65228, 0.8477 in dropout, enrolled, and graduated, respectively.
 
-
+133/200
 ################################################################################
 # Conclusion
 ################################################################################
