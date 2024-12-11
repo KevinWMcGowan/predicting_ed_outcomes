@@ -39,21 +39,23 @@ Since the dataset is part of the repository, it will automatically load and prep
 
 1. **Clone the Repository**
 
-To ensure the analysis runs correctly, download the entire repository as a zip file:
+To ensure the analysis runs correctly, download the entire repository below as a zip file:
 
-- [GitHub URL:](https://github.com/KevinWMcGowan/predicting_ed_outcomes.git)
-- Extract the contents to a local directory.
+- [GitHub Repository URL:](https://github.com/KevinWMcGowan/predicting_ed_outcomes.git)
 
-2. Load Data
+2. **Open the Zip File**
 
 The script automatically checks for the data folder within the unzipped repository. It ensures the presence of data.csv and variable_table.csv and loads them into the environment.
+- Open and run the R Script or knit the Rmd Report in R Studio
 
 3. Run Analysis
 
-	•	R Script: Run predicting_ed_outcomes.R to execute all preprocessing, feature engineering, and modeling steps.
-	•	R Markdown: Open predicting_ed_outcomes.Rmd and click “Knit” to generate a comprehensive report in PDF format.
-	•	Reports: Access pre-generated results in predicting_ed_outcomes.pdf.
+- R Script: Run predicting_ed_outcomes.R to execute all preprocessing, feature engineering, and modeling steps.
+- R Markdown: Open predicting_ed_outcomes.Rmd and click “Knit” to generate a comprehensive report in PDF format.
+- Reports: Access pre-generated results in predicting_ed_outcomes.pdf.
 
+**Additional Notes**
+If you're unable to knit the Rmd file to PdF yo're likely missing the appropriate software. Alternatively, use the carret key by the knit button to "knit to HTML."
 
 ## 🧠 Methodology
 
