@@ -43,10 +43,10 @@ To ensure the analysis runs correctly, download the entire repository below as a
 
 - [GitHub Repository URL:](https://github.com/KevinWMcGowan/predicting_ed_outcomes.git)
 
-2. **Open the Zip File**
+2. **Unzip the Zip File**
 
 The script automatically checks for the data folder within the unzipped repository. It ensures the presence of data.csv and variable_table.csv and loads them into the environment.
-- Open and run the R Script or knit the Rmd Report in R Studio
+- Click into the Zipfile and open either the R Script or Rmd Report in R Studio
 
 3. Run Analysis
 
