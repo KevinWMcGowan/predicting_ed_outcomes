@@ -19,8 +19,12 @@ This project employs machine learning techniques to predict student success usin
     - `predicting_ed_outcomes.Rmd`: R Markdown file for the detailed report
     - `predicting_ed_outcomes.pdf`: PDF version knit from R Markdown report
   - **scripts/**: Contains the R script
+    - `predicting_ed_outcomes.R`: R Script file for the analysis
+  - **data/**: Contains the data for the report and script
+    - `data.csv`: the numerically encoded dataset used for analysis
+    - `variable_table.csv`: the definitions for the numerically encoded dataset
 
-    - `predicting_ed_outcomes.R`: Script for all analysis and modeling
+
 ## 📊 Dataset Information
 
 The dataset originates from Martins and colleagues (2021) and represents student records from a single Portuguese university. It includes:
