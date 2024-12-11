@@ -41,7 +41,7 @@ Since the dataset is part of the repository, it will automatically load and prep
 
 To ensure the analysis runs correctly, download the entire repository as a zip file:
 
-- [GitHub URL:]([https://github.com/KevinWMcGowan/predicting_ed_outcomes.git])
+- [GitHub URL:](https://github.com/KevinWMcGowan/predicting_ed_outcomes.git)
 - Extract the contents to a local directory.
 
 2. Load Data
