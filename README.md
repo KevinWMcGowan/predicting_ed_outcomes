@@ -1,6 +1,6 @@
 # 🎓 Predicting Educational Outcomes
 
-Welcome to the Predicting Educational Outcomes Project, an analysis leveraging machine learning to classify and predict student outcomes: dropout, enrollment, or graduation. This repository includes an R Markdown report (predicting_ed_outcomes.Rmd), a PDF version knit from the R Markdown report (predicting_ed_outcomes.pdf), and a companion R script for preprocessing, feature engineering, and modeling.
+Welcome to the Predicting Educational Outcomes Project, an analysis leveraging machine learning to classify and predict student outcomes: dropout, enrollment, or graduation. This repository includes an R Markdown report (predicting_ed_outcomes.Rmd), a PDF version knit from the R Markdown report (predicting_ed_outcomes.pdf), and a companion R script for analysis.
 
 ## 📚 Overview
 
