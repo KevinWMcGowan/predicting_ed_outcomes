@@ -1080,14 +1080,10 @@ plot(gbt_model)
 # it's now time to test each model on the final_holdout_set
 
 # Step 1: Set Target as factor 
-# Ensure the target variable in the final_holdout_set is a factor
 final_holdout_set$target <- as.factor(final_holdout_set$target)
 
-# Step 2: Feature Engineering
-# Apply feature engineering function to final_holdout_set
+# Step 2: Apply Feature Engineering
 final_holdout_set <- feature_engineering(final_holdout_set)
-
-# Apply the feature engineering validation function
 validation_holdout_results <- validate_features(final_holdout_set)
 
 
