@@ -64,19 +64,23 @@ The dataset was cleaned and transformed for analysis. Key feature engineering st
 The project uses two primary machine learning models:
 
 - Decision Tree Classifiers for initial predictive modeling.
-Gradient Boosted Trees (GBT) with cross-validation for robust predictions.
-Evaluation Metrics
+- Gradient Boosted Trees (GBT) with cross-validation for robust predictions.
+
+**Evaluation Metrics**
 Model performance was assessed using:
 
-Sensitivity: Ability to correctly identify positive cases.
-Specificity: Ability to correctly identify negative cases.
-Precision: Positive Predictive Value.
-Balanced Accuracy: Average of sensitivity and specificity.
+- Sensitivity: Ability to correctly identify positive cases.
+- Specificity: Ability to correctly identify negative cases.
+- Precision: Positive Predictive Value.
+- Balanced Accuracy: Average of sensitivity and specificity.
 
-## 📋 Key Results
+## 📋 Report Objectives
 
-- The model predicts movie ratings with a low error rate, providing a strong foundation for building recommendation systems.
-- Features like user_movie_diff, user_avg_rating, and movie_avg_rating were the most influential predictors.
+This report outlines the step-by-step methodology used to build and validate the models. The goal is to highlight actionable insights for improving student outcomes, focusing on:
+
+- Identifying at-risk students.
+- Enhancing predictive accuracy with advanced modeling techniques.
+- Informing decision-making for educators and administrators.
 
 ## 🤝 Connect
 
