@@ -55,7 +55,7 @@ The script automatically checks for the data folder within the unzipped reposito
 - Reports: Access pre-generated results in predicting_ed_outcomes.pdf.
 
 **Additional Notes**
-If you're unable to knit the Rmd file to PdF yo're likely missing the appropriate software. Alternatively, use the carret key by the knit button to "knit to HTML."
+If you're unable to knit the Rmd file to PDF you're likely missing the appropriate software. Alternatively, use the carret key by the knit button to "knit to HTML."
 
 ## 🧠 Methodology
 
